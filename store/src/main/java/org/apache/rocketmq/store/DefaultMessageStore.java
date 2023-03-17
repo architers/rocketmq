@@ -534,13 +534,14 @@ public class DefaultMessageStore implements MessageStore {
     @Override
     public CompletableFuture<PutMessageResult> asyncPutMessage(MessageExtBrokerInner msg) {
 
+        //putMessage钩子，在put之前校验消息，同时对消息类型进行参数特定处理
         for (PutMessageHook putMessageHook : putMessageHookList) {
             PutMessageResult handleResult = putMessageHook.executeBeforePutMessage(msg);
             if (handleResult != null) {
                 return CompletableFuture.completedFuture(handleResult);
             }
         }
-
+        //TODO
         if (msg.getProperties().containsKey(MessageConst.PROPERTY_INNER_NUM)
             && !MessageSysFlag.check(msg.getSysFlag(), MessageSysFlag.INNER_BATCH_FLAG)) {
             LOGGER.warn("[BUG]The message had property {} but is not an inner batch", MessageConst.PROPERTY_INNER_NUM);
@@ -556,6 +557,7 @@ public class DefaultMessageStore implements MessageStore {
         }
 
         long beginTime = this.getSystemClock().now();
+        //异步将消费放到commitLog
         CompletableFuture<PutMessageResult> putResultFuture = this.commitLog.asyncPutMessage(msg);
 
         putResultFuture.thenAccept(result -> {
@@ -564,8 +566,9 @@ public class DefaultMessageStore implements MessageStore {
                 LOGGER.warn("DefaultMessageStore#putMessage: CommitLog#putMessage cost {}ms, topic={}, bodyLength={}",
                     elapsedTime, msg.getTopic(), msg.getBody().length);
             }
+            //记录putMessage最大耗时
             this.storeStatsService.setPutMessageEntireTimeMax(elapsedTime);
-
+            //put失败次数+1
             if (null == result || !result.isOk()) {
                 this.storeStatsService.getPutMessageFailedTimes().add(1);
             }
