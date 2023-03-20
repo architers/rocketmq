@@ -1,0 +1,5 @@
+{
+  "rocketMQClusterName": "DefaultCluster",
+  "proxyMode": "local",
+  "namesrvAddr": "localhost:9876"
+}
