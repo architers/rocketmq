@@ -57,6 +57,10 @@ import static org.apache.rocketmq.remoting.protocol.ResponseCode.CONTROLLER_BROK
  * both master and slave will start this timed task. 1.regularly syncing metadata from controllers, and changing broker
  * roles and master if needed, both master and slave will start this timed task. 2.regularly expanding and Shrinking
  * syncStateSet, only master will start this timed task.
+ * 代理副本的管理器，包括：
+ * 0.定期同步控制器元数据，更改控制器领导地址，主备双方都会启动这个定时任务。
+ * 1.定期从控制器同步元数据，并在需要时更改代理角色和主服务器，主站和从站都将启动此定时任务。
+ * 2.定期扩展和收缩同步状态集，只有主节点会启动此定时任务
  */
 public class ReplicasManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);

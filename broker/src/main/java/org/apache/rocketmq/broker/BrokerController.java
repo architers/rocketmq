@@ -1461,13 +1461,15 @@ public class BrokerController {
     protected void startBasicService() throws Exception {
 
         if (this.messageStore != null) {
+            //消息存储
             this.messageStore.start();
         }
 
         if (this.timerMessageStore != null) {
+            //定时消息存储
             this.timerMessageStore.start();
         }
-
+        // 副本管理器启动
         if (this.replicasManager != null) {
             this.replicasManager.start();
         }
@@ -1477,9 +1479,11 @@ public class BrokerController {
         }
 
         if (this.remotingServer != null) {
+            // netty服务端启动
             this.remotingServer.start();
 
-            // In test scenarios where it is up to OS to pick up an available port, set the listening port back to config
+            // In test scenarios where it is up to OS to pick up an available port, set the
+            // listening port back to config(在由操作系统选取可用端口的测试方案中，将侦听端口设置回配置)
             if (null != nettyServerConfig && 0 == nettyServerConfig.getListenPort()) {
                 nettyServerConfig.setListenPort(remotingServer.localListenPort());
             }
@@ -1489,8 +1493,10 @@ public class BrokerController {
             this.fastRemotingServer.start();
         }
 
+        //创建broker对应host信息（解决多网卡）
         this.storeHost = new InetSocketAddress(this.getBrokerConfig().getBrokerIP1(), this.getNettyServerConfig().getListenPort());
 
+        // TODO3 暂时不知道有什么用
         for (BrokerAttachedPlugin brokerAttachedPlugin : brokerAttachedPlugins) {
             if (brokerAttachedPlugin != null) {
                 brokerAttachedPlugin.start();
@@ -1557,6 +1563,7 @@ public class BrokerController {
 
     public void start() throws Exception {
 
+        //这里可以控制注册broker的时间,比如启动10分钟后才注册到namesrv中，就可以配置disappearTimeAfterStart为10分钟
         this.shouldStartTime = System.currentTimeMillis() + messageStoreConfig.getDisappearTimeAfterStart();
 
         if (messageStoreConfig.getTotalReplicas() > 1 && this.brokerConfig.isEnableSlaveActingMaster() || this.brokerConfig.isEnableControllerMode()) {
@@ -1564,16 +1571,22 @@ public class BrokerController {
         }
 
         if (this.brokerOuterAPI != null) {
+            //启动broker和外部交互的api(注册broker、心跳等）
             this.brokerOuterAPI.start();
         }
-
+        //启动基础服务
         startBasicService();
 
+        //TODO changeSpecialServiceStatus
         if (!isIsolated && !this.messageStoreConfig.isEnableDLegerCommitLog() && !this.messageStoreConfig.isDuplicationEnable()) {
+            /**
+             *主从模式下，会根据节点类型改变一些服务的状态
+             */
             changeSpecialServiceStatus(this.brokerConfig.getBrokerId() == MixAll.MASTER_ID);
             this.registerBrokerAll(true, false, true);
         }
 
+        //添加定时任务，注册broker信息（10秒后启动，定时任务的时间在10-60秒之间）
         scheduledFutures.add(this.scheduledExecutorService.scheduleAtFixedRate(new AbstractBrokerRunnable(this.getBrokerIdentity()) {
             @Override
             public void run0() {
@@ -1593,6 +1606,7 @@ public class BrokerController {
             }
         }, 1000 * 10, Math.max(10000, Math.min(brokerConfig.getRegisterNameServerPeriod(), 60000)), TimeUnit.MILLISECONDS));
 
+        // 从切换为主节点，就定时向namesrv发送心跳，并定时同步broker成员信息
         if (this.brokerConfig.isEnableSlaveActingMaster()) {
             scheduleSendHeartbeat();
 
@@ -1609,6 +1623,7 @@ public class BrokerController {
         }
 
         if (this.brokerConfig.isEnableControllerMode()) {
+            // 主从模式下，定时向namesrv发送心跳
             scheduleSendHeartbeat();
         }
 

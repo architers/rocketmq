@@ -321,6 +321,7 @@ public class BrokerConfig extends BrokerIdentity {
 
     /**
      * Is startup controller mode, which support auto switch broker's role.
+     * 是否能够主从切换
      */
     private boolean enableControllerMode = false;
 
