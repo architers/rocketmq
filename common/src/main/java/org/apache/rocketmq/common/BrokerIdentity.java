@@ -54,8 +54,11 @@ public class BrokerIdentity {
 
     private boolean isBrokerContainer = false;
 
-    // Do not set it manually, it depends on the startup mode
-    // Broker start by BrokerStartup is false, start or add by BrokerContainer is true
+    /**
+     * 是否启动BrokerContainer
+     *   Do not set it manually, it depends on the startup mode
+     *   Broker start by BrokerStartup is false, start or add by BrokerContainer is true
+     */
     private boolean isInBrokerContainer = false;
 
     public BrokerIdentity() {
