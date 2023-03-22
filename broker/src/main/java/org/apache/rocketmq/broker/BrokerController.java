@@ -850,9 +850,15 @@ public class BrokerController {
         return result;
     }
 
+    /**
+     * 注册putMessage的钩子
+     */
     public void registerMessageStoreHook() {
         List<PutMessageHook> putMessageHookList = messageStore.getPutMessageHookList();
 
+        /*
+         * 校验put的消息：例如topic的长度大小以及body不能为空能
+         */
         putMessageHookList.add(new PutMessageHook() {
             @Override
             public String hookName() {
@@ -865,6 +871,9 @@ public class BrokerController {
             }
         });
 
+        /*
+         * 校验批量消息
+         */
         putMessageHookList.add(new PutMessageHook() {
             @Override
             public String hookName() {
@@ -880,6 +889,11 @@ public class BrokerController {
             }
         });
 
+        /*
+         * 定时消息处理：
+         * 1.将时间轮消息放入 TimerMessageStore.TIMER_TOPIC
+         * 2.将延迟级别消息放入 TopicValidator.RMQ_SYS_SCHEDULE_TOPIC
+         */
         putMessageHookList.add(new PutMessageHook() {
             @Override
             public String hookName() {
@@ -895,6 +909,9 @@ public class BrokerController {
             }
         });
 
+        /*
+         * TODO2 干什么的
+         */
         SendMessageBackHook sendMessageBackHook = new SendMessageBackHook() {
             @Override
             public boolean executeSendMessageBack(List<MessageExt> msgList, String brokerName, String brokerAddr) {
@@ -2040,7 +2057,6 @@ public class BrokerController {
                 this.scheduleMessageService.stop();
             }
             isScheduleServiceStart = shouldStart;
-
             if (timerMessageStore != null) {
                 timerMessageStore.setShouldRunningDequeue(shouldStart);
             }
