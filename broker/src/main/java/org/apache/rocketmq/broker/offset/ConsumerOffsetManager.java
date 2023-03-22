@@ -36,6 +36,9 @@ import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 import org.apache.rocketmq.remoting.protocol.DataVersion;
 import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
 
+/**
+ * 消费偏移量管理
+ */
 public class ConsumerOffsetManager extends ConfigManager {
     private static final Logger LOG = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     public static final String TOPIC_GROUP_SEPARATOR = "@";
@@ -77,6 +80,9 @@ public class ConsumerOffsetManager extends ConfigManager {
         }
     }
 
+    /**
+     * 清除topic偏移量信息
+     */
     public void cleanOffsetByTopic(String topic) {
         Iterator<Entry<String, ConcurrentMap<Integer, Long>>> it = this.offsetTable.entrySet().iterator();
         while (it.hasNext()) {
@@ -190,6 +196,9 @@ public class ConsumerOffsetManager extends ConfigManager {
         this.commitOffset(clientHost, key, queueId, offset);
     }
 
+    /**
+     * 提交偏移量
+     */
     private void commitOffset(final String clientHost, final String key, final int queueId, final long offset) {
         ConcurrentMap<Integer, Long> map = this.offsetTable.get(key);
         if (null == map) {
@@ -208,6 +217,9 @@ public class ConsumerOffsetManager extends ConfigManager {
         }
     }
 
+    /**
+     * 提交拉偏移量
+     */
     public void commitPullOffset(final String clientHost, final String group, final String topic, final int queueId,
         final long offset) {
         // topic@group
@@ -218,8 +230,10 @@ public class ConsumerOffsetManager extends ConfigManager {
     }
 
     /**
+     * 根据消费组、topic、队列查询偏移量
      * If the target queue has temporary reset offset, return the reset-offset.
      * Otherwise, return the current consume offset in the offset store.
+     * 如果目标队列具有临时重置偏移量，则返回重置偏移量。否则，返回偏移存储中的当前消耗偏移
      * @param group Consumer group
      * @param topic Topic
      * @param queueId Queue ID
@@ -248,11 +262,11 @@ public class ConsumerOffsetManager extends ConfigManager {
     }
 
     /**
-     * Query pull offset in pullOffsetTable
+     * Query pull offset in pullOffsetTable（拉取偏移表中的查询拉取偏移量）
      * @param group Consumer group
      * @param topic Topic
      * @param queueId Queue ID
-     * @return latest pull offset of consumer group
+     * @return latest pull offset of consumer group （消费群体最新拉动偏移）
      */
     public long queryPullOffset(final String group, final String topic, final int queueId) {
         // topic@group
