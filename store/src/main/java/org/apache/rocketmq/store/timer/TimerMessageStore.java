@@ -422,6 +422,7 @@ public class TimerMessageStore {
     public void start() {
         this.shouldStartTime = storeConfig.getDisappearTimeAfterStart() + System.currentTimeMillis();
         maybeMoveWriteTime();
+        //启动拉取定时消息的service
         enqueueGetService.start();
         enqueuePutService.start();
         dequeueWarmService.start();
@@ -610,15 +611,19 @@ public class TimerMessageStore {
         if (!isRunningEnqueue()) {
             return false;
         }
+        //根据定时任务的topic获取consumeQueue
         ConsumeQueue cq = (ConsumeQueue) this.messageStore.getConsumeQueue(TIMER_TOPIC, queueId);
         if (null == cq) {
+            //队列不存在，就返回（没有延迟消息）
             return false;
         }
+        //如果currQueueOffset小于cq的最小的offset,就重新给currQueueOffset赋值为cq的最小的offset
         if (currQueueOffset < cq.getMinOffsetInQueue()) {
             LOGGER.warn("Timer currQueueOffset:{} is smaller than minOffsetInQueue:{}", currQueueOffset, cq.getMinOffsetInQueue());
             currQueueOffset = cq.getMinOffsetInQueue();
         }
         long offset = currQueueOffset;
+        //TODO3 SelectMappedBufferResult是什么东西
         SelectMappedBufferResult bufferCQ = cq.getIndexBuffer(offset);
         if (null == bufferCQ) {
             return false;
@@ -631,6 +636,7 @@ public class TimerMessageStore {
                     long offsetPy = bufferCQ.getByteBuffer().getLong();
                     int sizePy = bufferCQ.getByteBuffer().getInt();
                     bufferCQ.getByteBuffer().getLong(); //tags code
+                    //根绝offset和消息size获取存储的消息
                     MessageExt msgExt = getMessageByCommitOffset(offsetPy, sizePy);
                     if (null == msgExt) {
                         perfs.getCounter("enqueue_get_miss");
@@ -642,6 +648,7 @@ public class TimerMessageStore {
                         msgExt.setQueueOffset(offset + (i / ConsumeQueue.CQ_STORE_UNIT_SIZE));
                         TimerRequest timerRequest = new TimerRequest(offsetPy, sizePy, delayedTime, System.currentTimeMillis(), MAGIC_DEFAULT, msgExt);
                         while (true) {
+                            // 将延迟消息放入enqueuePutQueue队列中
                             if (enqueuePutQueue.offer(timerRequest, 3, TimeUnit.SECONDS)) {
                                 break;
                             }
@@ -1237,6 +1244,9 @@ public class TimerMessageStore {
 
     }
 
+    /**
+     * 负责从系统定时 Topic 里面拉取消息放入 enqueuePutQueue 等待 TimerEnqueuePutService 的处理
+     */
     class TimerEnqueueGetService extends ServiceThread {
 
         @Override public String getServiceName() {
@@ -1263,6 +1273,9 @@ public class TimerMessageStore {
         }
     }
 
+    /**
+     * 负责构建 TimerLog 记录，并将其放入时间轮的对应的刻度中
+     */
     class TimerEnqueuePutService extends ServiceThread {
 
         @Override public String getServiceName() {
@@ -1345,6 +1358,9 @@ public class TimerMessageStore {
         }
     }
 
+    /**
+     * 负责转动时间轮，并取出当前时间刻度的所有 TimerLog 记录放入 dequeueGetQueue
+     */
     class TimerDequeueGetService extends ServiceThread {
 
         @Override public String getServiceName() {
@@ -1389,6 +1405,9 @@ public class TimerMessageStore {
         }
     }
 
+    /**
+     * 负责判断队列中的消息是否已经到期，如果已经到期了，那么将其投入用户的 Topic 中，等待消费消费；如果还没有到期，那么重新投入系统定时 Topic，等待重新进入时间轮
+     */
     class TimerDequeuePutMessageService extends AbstractStateService {
 
         @Override public String getServiceName() {
@@ -1458,6 +1477,9 @@ public class TimerMessageStore {
         }
     }
 
+    /**
+     * 负责根据 TimerLog 记录，从 CommitLog 中读取消息
+     */
     class TimerDequeueGetMessageService extends AbstractStateService {
 
         @Override public String getServiceName() {
