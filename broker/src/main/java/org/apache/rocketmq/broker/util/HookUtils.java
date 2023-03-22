@@ -129,21 +129,23 @@ public class HookUtils {
     public static PutMessageResult handleScheduleMessage(BrokerController brokerController,
         final MessageExtBrokerInner msg) {
         final int tranType = MessageSysFlag.getTransactionValue(msg.getSysFlag());
+        //如果不是事务类型，或者为事务提交就进行定时消息处理
         if (tranType == MessageSysFlag.TRANSACTION_NOT_TYPE
             || tranType == MessageSysFlag.TRANSACTION_COMMIT_TYPE) {
             if (!isRolledTimerMessage(msg)) {
                 if (checkIfTimerMessage(msg)) {
                     if (!brokerController.getMessageStoreConfig().isTimerWheelEnable()) {
-                        //wheel timer is not enabled, reject the message
+                        //wheel timer is not enabled, reject the message（timerWheelEnable没有开启就返回)
                         return new PutMessageResult(PutMessageStatus.WHEEL_TIMER_NOT_ENABLE, null);
                     }
+                    //处理时间轮定时消息，转为topic为TimerMessageStore.TIMER_TOPIC
                     PutMessageResult transformRes = transformTimerMessage(brokerController, msg);
                     if (null != transformRes) {
                         return transformRes;
                     }
                 }
             }
-            // Delay Delivery
+            // Delay Delivery 延迟级别消息处理topic处理 TopicValidator.RMQ_SYS_SCHEDULE_TOPIC
             if (msg.getDelayTimeLevel() > 0) {
                 transformDelayLevelMessage(brokerController, msg);
             }
@@ -193,6 +195,7 @@ public class HookUtils {
             return new PutMessageResult(PutMessageStatus.WHEEL_TIMER_MSG_ILLEGAL, null);
         }
         if (deliverMs > System.currentTimeMillis()) {
+            //最大延迟时间超过TimerMaxDelaySec（默认三天），就返回不合法
             if (delayLevel <= 0 && deliverMs - System.currentTimeMillis() > brokerController.getMessageStoreConfig().getTimerMaxDelaySec() * 1000L) {
                 return new PutMessageResult(PutMessageStatus.WHEEL_TIMER_MSG_ILLEGAL, null);
             }
