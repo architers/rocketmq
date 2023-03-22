@@ -298,33 +298,52 @@ public class BrokerController {
         this.nettyClientConfig = nettyClientConfig;
         this.messageStoreConfig = messageStoreConfig;
         this.setStoreHost(new InetSocketAddress(this.getBrokerConfig().getBrokerIP1(), getListenPort()));
+        //TODO1 brokerStatsManager作用
         this.brokerStatsManager = messageStoreConfig.isEnableLmq() ? new LmqBrokerStatsManager(this.brokerConfig.getBrokerClusterName(), this.brokerConfig.isEnableDetailStat()) : new BrokerStatsManager(this.brokerConfig.getBrokerClusterName(), this.brokerConfig.isEnableDetailStat());
+        //消费者偏移量管理
         this.consumerOffsetManager = messageStoreConfig.isEnableLmq() ? new LmqConsumerOffsetManager(this) : new ConsumerOffsetManager(this);
+        //广播偏移量管理
         this.broadcastOffsetManager = new BroadcastOffsetManager(this);
+        //topic配置管理
         this.topicConfigManager = messageStoreConfig.isEnableLmq() ? new LmqTopicConfigManager(this) : new TopicConfigManager(this);
+        //topic与队列映射管理器
         this.topicQueueMappingManager = new TopicQueueMappingManager(this);
+        //拉消息处理器
         this.pullMessageProcessor = new PullMessageProcessor(this);
+        //TODO1
         this.peekMessageProcessor = new PeekMessageProcessor(this);
         this.pullRequestHoldService = messageStoreConfig.isEnableLmq() ? new LmqPullRequestHoldService(this) : new PullRequestHoldService(this);
+        //TODO1
         this.popMessageProcessor = new PopMessageProcessor(this);
+        //TODO1
         this.notificationProcessor = new NotificationProcessor(this);
         this.pollingInfoProcessor = new PollingInfoProcessor(this);
+        //ack消息处理器
         this.ackMessageProcessor = new AckMessageProcessor(this);
+        //TODO1
         this.changeInvisibleTimeProcessor = new ChangeInvisibleTimeProcessor(this);
         this.sendMessageProcessor = new SendMessageProcessor(this);
         this.replyMessageProcessor = new ReplyMessageProcessor(this);
+        //消息到达监听器
         this.messageArrivingListener = new NotifyMessageArrivingListener(this.pullRequestHoldService, this.popMessageProcessor, this.notificationProcessor);
+        //TODO1
         this.consumerIdsChangeListener = new DefaultConsumerIdsChangeListener(this);
+        //消费者管理
         this.consumerManager = new ConsumerManager(this.consumerIdsChangeListener, this.brokerStatsManager, this.brokerConfig);
+        //生产者管理
         this.producerManager = new ProducerManager(this.brokerStatsManager);
+        //TODO1
         this.consumerFilterManager = new ConsumerFilterManager(this);
+        //TODO1
         this.consumerOrderInfoManager = new ConsumerOrderInfoManager(this);
+        //TODO1
         this.popInflightMessageCounter = new PopInflightMessageCounter(this);
         this.clientHousekeepingService = new ClientHousekeepingService(this);
         this.broker2Client = new Broker2Client(this);
         this.subscriptionGroupManager = messageStoreConfig.isEnableLmq() ? new LmqSubscriptionGroupManager(this) : new SubscriptionGroupManager(this);
         this.scheduleMessageService = new ScheduleMessageService(this);
 
+        //broker调用外部api
         if (nettyClientConfig != null) {
             this.brokerOuterAPI = new BrokerOuterAPI(nettyClientConfig);
         }
@@ -394,6 +413,7 @@ public class BrokerController {
 
         this.escapeBridge = new EscapeBridge(this);
 
+        //主题路由信息管理器
         this.topicRouteInfoManager = new TopicRouteInfoManager(this);
 
         if (this.brokerConfig.isEnableSlaveActingMaster() && !this.brokerConfig.isSkipPreOnline()) {

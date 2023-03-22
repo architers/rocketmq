@@ -236,6 +236,9 @@ public class MessageStoreConfig {
 
     private boolean enableScheduleMessageStats = true;
 
+    /**
+     * 是否启动微消息队列
+     */
     private boolean enableLmq = false;
     private boolean enableMultiDispatch = false;
     private int maxLmqConsumeQueueNum = 20000;

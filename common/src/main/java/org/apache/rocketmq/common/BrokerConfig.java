@@ -304,6 +304,7 @@ public class BrokerConfig extends BrokerIdentity {
 
     private boolean asyncSendEnable = true;
 
+    //TODO1 有什么作用
     private boolean useServerSideResetOffset = false;
 
     private long consumerOffsetUpdateVersionStep = 500;
