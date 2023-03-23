@@ -74,9 +74,6 @@ import org.apache.rocketmq.store.stats.BrokerStatsManager;
 
 import static org.apache.rocketmq.remoting.protocol.RemotingCommand.buildErrorResponse;
 
-/**
- * 拉取消息处理器
- */
 public class PullMessageProcessor implements NettyRequestProcessor {
     private static final Logger LOGGER = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private List<ConsumeMessageHook> consumeMessageHookList;
@@ -369,7 +366,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
             }
         }
 
-        //如果requestHeader.getQueueId() < 0或者队列Id大于读队列（如果突然缩小读队列，就会出现这种结果））,就直接报系统异常
+        //队列Id大约读队列,直接报错（如果突然缩小读队列，就会出现这种结果）
         if (requestHeader.getQueueId() < 0 || requestHeader.getQueueId() >= topicConfig.getReadQueueNums()) {
             String errorInfo = String.format("queueId[%d] is illegal, topic:[%s] topicConfig.readQueueNums:[%d] consumer:[%s]",
                 requestHeader.getQueueId(), requestHeader.getTopic(), topicConfig.getReadQueueNums(), channel.remoteAddress());
@@ -391,7 +388,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
                 consumerManager.compensateBasicConsumerInfo(requestHeader.getConsumerGroup(), ConsumeType.CONSUME_ACTIVELY, MessageModel.CLUSTERING);
                 break;
             default:
-                //集群消费
+                //正常消费
                 consumerManager.compensateBasicConsumerInfo(requestHeader.getConsumerGroup(), ConsumeType.CONSUME_PASSIVELY, MessageModel.CLUSTERING);
                 break;
         }
@@ -429,7 +426,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
                 response.setRemark("the consumer's group info not exist" + FAQUrl.suggestTodo(FAQUrl.SAME_GROUP_DIFFERENT_TOPIC));
                 return response;
             }
-            //如果是广播模式，判断是否该消费者组是否开启广播消费
+            //如果是广播模式，判断是否该消费者组时候能够广播消费
             if (!subscriptionGroupConfig.isConsumeBroadcastEnable()
                 && consumerGroupInfo.getMessageModel() == MessageModel.BROADCASTING) {
                 response.setCode(ResponseCode.NO_PERMISSION);
@@ -438,7 +435,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
                 return response;
             }
 
-            //判断订阅组下的topic是否被禁用
+            //判断该topic的订阅组时候被禁用（TODO3:怎么显示消费组下某个topic）
             boolean readForbidden = this.brokerController.getSubscriptionGroupManager().getForbidden(
                 subscriptionGroupConfig.getGroupName(), requestHeader.getTopic(), PermName.INDEX_PERM_READ);
             if (readForbidden) {
@@ -447,7 +444,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
                 response.setRemark("the consumer group[" + requestHeader.getConsumerGroup() + "] is forbidden for topic[" + requestHeader.getTopic() + "]");
                 return response;
             }
-            //判断消费组下topic的订阅数据是否存在
+
             subscriptionData = consumerGroupInfo.findSubscriptionData(requestHeader.getTopic());
             if (null == subscriptionData) {
                 LOGGER.warn("the consumer's subscription not exist, group: {}, topic:{}", requestHeader.getConsumerGroup(), requestHeader.getTopic());
