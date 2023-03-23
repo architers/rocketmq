@@ -728,6 +728,9 @@ public class DefaultMessageStore implements MessageStore {
         return dispatchRequest.isSuccess();
     }
 
+    /**
+     * 获取消息TODO1 看详情
+     */
     @Override
     public GetMessageResult getMessage(final String group, final String topic, final int queueId, final long offset,
         final int maxMsgNums, final MessageFilter messageFilter) {
