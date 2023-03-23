@@ -42,6 +42,9 @@ public class ConsumerManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private final ConcurrentMap<String, ConsumerGroupInfo> consumerTable =
         new ConcurrentHashMap<>(1024);
+    /**
+     * 消费者补充信息：TODO2 有何作用？
+     */
     private final ConcurrentMap<String, ConsumerGroupInfo> consumerCompensationTable =
         new ConcurrentHashMap<>(1024);
     private final List<ConsumerIdsChangeListener> consumerIdsChangeListenerList = new CopyOnWriteArrayList<>();

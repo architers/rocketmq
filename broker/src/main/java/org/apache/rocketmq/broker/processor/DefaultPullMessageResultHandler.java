@@ -184,6 +184,7 @@ public class DefaultPullMessageResultHandler implements PullMessageResultHandler
                     int queueId = requestHeader.getQueueId();
                     PullRequest pullRequest = new PullRequest(request, channel, pollingTimeMills,
                         this.brokerController.getMessageStore().now(), offset, subscriptionData, messageFilter);
+                    //没有找到消息，就hold住pull请求（PullRequestHoldService有定时任务扫描队列中是否有新的数据，有就主动推送）
                     this.brokerController.getPullRequestHoldService().suspendPullRequest(topic, queueId, pullRequest);
                     return null;
                 }
