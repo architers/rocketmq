@@ -44,6 +44,8 @@ import org.apache.rocketmq.store.PutMessageStatus;
 import org.apache.rocketmq.store.pop.AckMsg;
 
 /**
+ * AckMessageProcessor（ack消息处理器，pop消息才会ack)
+ *
  * TODO1 ack消息流程
  */
 public class AckMessageProcessor implements NettyRequestProcessor {
