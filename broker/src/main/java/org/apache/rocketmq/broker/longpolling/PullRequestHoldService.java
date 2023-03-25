@@ -29,6 +29,10 @@ import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 import org.apache.rocketmq.store.ConsumeQueueExt;
 
+/**
+ * 保留拉取消息的PullRequest
+ * <li>消费者可能一直拉取不到消息，为了性能考虑，就hold这些pull请求,定时任务扫描，当发现有新的消息到达的时候，再执行这些pullRequest</li>
+ */
 public class PullRequestHoldService extends ServiceThread {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     protected static final String TOPIC_QUEUEID_SEPARATOR = "@";
@@ -41,6 +45,9 @@ public class PullRequestHoldService extends ServiceThread {
         this.brokerController = brokerController;
     }
 
+    /**
+     * 挂起拉取请求
+     */
     public void suspendPullRequest(final String topic, final int queueId, final PullRequest pullRequest) {
         String key = this.buildKey(topic, queueId);
         ManyPullRequest mpr = this.pullRequestTable.get(key);
@@ -64,6 +71,9 @@ public class PullRequestHoldService extends ServiceThread {
         return sb.toString();
     }
 
+    /**
+     * 每隔一段时间，就检查hold住的请求
+     */
     @Override
     public void run() {
         log.info("{} service started", this.getServiceName());
@@ -97,6 +107,7 @@ public class PullRequestHoldService extends ServiceThread {
         return PullRequestHoldService.class.getSimpleName();
     }
 
+
     protected void checkHoldRequest() {
         for (String key : this.pullRequestTable.keySet()) {
             String[] kArray = key.split(TOPIC_QUEUEID_SEPARATOR);
@@ -119,6 +130,7 @@ public class PullRequestHoldService extends ServiceThread {
         notifyMessageArriving(topic, queueId, maxOffset, null, 0, null, null);
     }
 
+
     public void notifyMessageArriving(final String topic, final int queueId, final long maxOffset, final Long tagsCode,
         long msgStoreTime, byte[] filterBitMap, Map<String, String> properties) {
         String key = this.buildKey(topic, queueId);
@@ -133,7 +145,9 @@ public class PullRequestHoldService extends ServiceThread {
                     if (newestOffset <= request.getPullFromThisOffset()) {
                         newestOffset = this.brokerController.getMessageStore().getMaxOffsetInQueue(topic, queueId);
                     }
-
+                    /*
+                     * 如果队列的offset>pullRequest的offset，说明就有新的消息抵达，就调用PullMessage处理器，执行原来的请求
+                     */
                     if (newestOffset > request.getPullFromThisOffset()) {
                         boolean match = request.getMessageFilter().isMatchedByConsumeQueue(tagsCode,
                             new ConsumeQueueExt.CqExtUnit(tagsCode, msgStoreTime, filterBitMap));
@@ -177,6 +191,9 @@ public class PullRequestHoldService extends ServiceThread {
         }
     }
 
+    /**
+     * TODO2
+     */
     public void notifyMasterOnline() {
         for (ManyPullRequest mpr : this.pullRequestTable.values()) {
             if (mpr == null || mpr.isEmpty()) {
