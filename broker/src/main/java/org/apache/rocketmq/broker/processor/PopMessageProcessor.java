@@ -266,7 +266,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         if (requestHeader.isOrder()) {
             orderCountInfo = new StringBuilder(64);
         }
-
+        //补偿消费者信息
         brokerController.getConsumerManager().compensateBasicConsumerInfo(requestHeader.getConsumerGroup(),
             ConsumeType.CONSUME_POP, MessageModel.CLUSTERING);
 
@@ -288,6 +288,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                 this.brokerController.getBrokerConfig().getBrokerIP1()));
             return response;
         }
+        //pop消息最大数量为32
         if (requestHeader.getMaxMsgNums() > 32) {
             response.setCode(ResponseCode.SYSTEM_ERROR);
             response.setRemark(String.format("the broker[%s] poping message's num is greater than 32",
@@ -337,6 +338,9 @@ public class PopMessageProcessor implements NettyRequestProcessor {
             return response;
         }
 
+        /*
+         * 构建消息过滤器，并补偿订阅数据（消费组下的topic订阅信息）
+         */
         ExpressionMessageFilter messageFilter = null;
         if (requestHeader.getExp() != null && requestHeader.getExp().length() > 0) {
             try {
