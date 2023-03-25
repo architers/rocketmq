@@ -131,6 +131,9 @@ import static org.apache.rocketmq.remoting.protocol.RemotingSysResponseCode.SUCC
 import static org.apache.rocketmq.remoting.protocol.ResponseCode.CONTROLLER_BROKER_METADATA_NOT_EXIST;
 import static org.apache.rocketmq.remoting.protocol.ResponseCode.CONTROLLER_NOT_LEADER;
 
+/**
+ * broker调用外部的api
+ */
 public class BrokerOuterAPI {
     private static final Logger LOGGER = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private final RemotingClient remotingClient;
@@ -205,6 +208,9 @@ public class BrokerOuterAPI {
         return this.remotingClient.isAddressReachable(address);
     }
 
+    /**
+     * TODO1 何时NameServerAddress的值会发生改变
+     */
     public void updateNameServerAddressList(final String addrs) {
         String[] addrArray = addrs.split(";");
         List<String> lst = new ArrayList<>(Arrays.asList(addrArray));
