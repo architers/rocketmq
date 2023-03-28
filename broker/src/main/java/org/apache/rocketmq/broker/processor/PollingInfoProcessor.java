@@ -37,6 +37,9 @@ import org.apache.rocketmq.remoting.protocol.header.PollingInfoRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.PollingInfoResponseHeader;
 import org.apache.rocketmq.remoting.protocol.subscription.SubscriptionGroupConfig;
 
+/**
+ * TODO1 暂时不知道什么有什么作用
+ */
 public class PollingInfoProcessor implements NettyRequestProcessor {
     private static final Logger POP_LOGGER = LoggerFactory.getLogger(LoggerName.ROCKETMQ_POP_LOGGER_NAME);
     private final BrokerController brokerController;

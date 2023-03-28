@@ -38,7 +38,7 @@ public class BrokerConfig extends BrokerIdentity {
     private int listenPort = 6888;
 
     /**
-     * brokerIP1 当前broker监听的IP
+     * brokerIP1 当前broker监听的IP(生产者和消费者连接broker使用的就是这个IP)
      * brokerIP2 存在broker主从时，在broker主节点上配置了brokerIP2的话,broker从节点会连接主节点配置的brokerIP2来同步。
      * 默认不配置brokerIP1和brokerIP2时，都会根据当前网卡选择一个IP使用，当你的机器有多块网卡时，很有可能会有问题。
      */
@@ -278,7 +278,7 @@ public class BrokerConfig extends BrokerIdentity {
     private int transactionOpBatchInterval = 3000;
 
     /**
-     * Acl feature switch
+     * Acl feature switch（是否开启权限）
      */
     @ImportantField
     private boolean aclEnable = false;
