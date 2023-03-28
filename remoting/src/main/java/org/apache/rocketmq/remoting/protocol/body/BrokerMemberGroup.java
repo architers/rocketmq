@@ -23,6 +23,9 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
 
+/**
+ * broker集群信息
+ */
 public class BrokerMemberGroup extends RemotingSerializable {
     private String cluster;
     private String brokerName;

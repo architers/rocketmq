@@ -28,6 +28,9 @@ import org.apache.rocketmq.remoting.netty.NettyServerConfig;
 import org.apache.rocketmq.store.MessageStore;
 import org.apache.rocketmq.store.config.MessageStoreConfig;
 
+/**
+ * TODO1暂时不知道什么作用
+ */
 public class InnerBrokerController extends BrokerController {
     protected BrokerContainer brokerContainer;
 

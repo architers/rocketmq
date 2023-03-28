@@ -297,7 +297,7 @@ public class BrokerController {
         this.nettyServerConfig = nettyServerConfig;
         this.nettyClientConfig = nettyClientConfig;
         this.messageStoreConfig = messageStoreConfig;
-
+        //构建broker存储host
         this.setStoreHost(new InetSocketAddress(this.getBrokerConfig().getBrokerIP1(), getListenPort()));
         //TODO1 brokerStatsManager作用
         this.brokerStatsManager = messageStoreConfig.isEnableLmq() ? new LmqBrokerStatsManager(this.brokerConfig.getBrokerClusterName(), this.brokerConfig.isEnableDetailStat()) : new BrokerStatsManager(this.brokerConfig.getBrokerClusterName(), this.brokerConfig.isEnableDetailStat());
@@ -317,16 +317,19 @@ public class BrokerController {
         this.pullRequestHoldService = messageStoreConfig.isEnableLmq() ? new LmqPullRequestHoldService(this) : new PullRequestHoldService(this);
         // 改变消息可见性处理器(只有Pop的消息才会有）
         this.popMessageProcessor = new PopMessageProcessor(this);
-        //TODO1
+        //通知管理器
         this.notificationProcessor = new NotificationProcessor(this);
+        //TODO1 有什么作用
         this.pollingInfoProcessor = new PollingInfoProcessor(this);
         //ack消息处理器
         this.ackMessageProcessor = new AckMessageProcessor(this);
-        //TODO1
+        //改变消息可见性处理器（pop消息用）
         this.changeInvisibleTimeProcessor = new ChangeInvisibleTimeProcessor(this);
+        //发送消息处理器
         this.sendMessageProcessor = new SendMessageProcessor(this);
+        //回复消息处理器
         this.replyMessageProcessor = new ReplyMessageProcessor(this);
-        //消息到达监听器
+        //消息到达监听器，当消息抵达的时候，会通知pullRequestHoldService、popMessageProcessor、notificationProcessor
         this.messageArrivingListener = new NotifyMessageArrivingListener(this.pullRequestHoldService, this.popMessageProcessor, this.notificationProcessor);
         //TODO1
         this.consumerIdsChangeListener = new DefaultConsumerIdsChangeListener(this);
@@ -340,7 +343,9 @@ public class BrokerController {
         this.consumerOrderInfoManager = new ConsumerOrderInfoManager(this);
         //TODO1
         this.popInflightMessageCounter = new PopInflightMessageCounter(this);
+        //TODO1
         this.clientHousekeepingService = new ClientHousekeepingService(this);
+        //TODO1
         this.broker2Client = new Broker2Client(this);
         //订阅组管理器
         this.subscriptionGroupManager = messageStoreConfig.isEnableLmq() ? new LmqSubscriptionGroupManager(this) : new SubscriptionGroupManager(this);
@@ -413,6 +418,8 @@ public class BrokerController {
             }
         });
 
+
+        //new 当前的broker信息，并添加到集群信息中
         this.brokerMemberGroup = new BrokerMemberGroup(this.brokerConfig.getBrokerClusterName(), this.brokerConfig.getBrokerName());
         this.brokerMemberGroup.getBrokerAddrs().put(this.brokerConfig.getBrokerId(), this.getBrokerAddr());
 
@@ -1013,6 +1020,9 @@ public class BrokerController {
         this.transactionalMessageCheckService = new TransactionalMessageCheckService(this);
     }
 
+    /**
+     * 初始化acl权限控制
+     */
     private void initialAcl() {
         if (!this.brokerConfig.isAclEnable()) {
             LOG.info("The broker dose not enable acl");
@@ -1044,6 +1054,9 @@ public class BrokerController {
         }
     }
 
+    /**
+     * 初始化RPC远程调用的钩子
+     */
     private void initialRpcHooks() {
 
         List<RPCHook> rpcHooks = ServiceProvider.load(RPCHook.class);

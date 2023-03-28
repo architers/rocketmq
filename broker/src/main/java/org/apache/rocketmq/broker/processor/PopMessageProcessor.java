@@ -115,6 +115,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
 
     public PopMessageProcessor(final BrokerController brokerController) {
         this.brokerController = brokerController;
+        //TODO1
         this.reviveTopic = PopAckConstants.buildClusterReviveTopic(this.brokerController.getBrokerConfig().getBrokerClusterName());
         // 100000 topic default,  100000 lru topic + cid + qid
         this.topicCidMap = new ConcurrentHashMap<>(this.brokerController.getBrokerConfig().getPopPollingMapSize());
@@ -138,6 +139,10 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         return queueLockManager;
     }
 
+    /**
+     *
+     * 得到消息ack唯一ID
+     */
     public static String genAckUniqueId(AckMsg ackMsg) {
         return ackMsg.getTopic()
             + PopAckConstants.SPLIT + ackMsg.getQueueId()
@@ -148,6 +153,10 @@ public class PopMessageProcessor implements NettyRequestProcessor {
             + PopAckConstants.SPLIT + PopAckConstants.ACK_TAG;
     }
 
+    /**
+     *
+     * 得到pop消息句柄信息的唯一ID(ACK 时要通过句柄来定位到它)
+     */
     public static String genCkUniqueId(PopCheckPoint ck) {
         return ck.getTopic()
             + PopAckConstants.SPLIT + ck.getQueueId()
@@ -869,6 +878,9 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         return byteBuffer.array();
     }
 
+    /**
+     * 长轮训service
+     */
     public class PopLongPollingService extends ServiceThread {
 
         private long lastCleanTime = 0;
@@ -962,6 +974,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                             if (first == null) {
                                 break;
                             }
+                            //TODO2 任务超时为什么还要放回队列中
                             if (!first.isTimeout()) {
                                 if (popQ.add(first)) {
                                     break;
@@ -973,6 +986,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                                 POP_LOGGER.info("timeout , wakeUp polling : {}", first);
                             }
                             totalPollingNum.decrementAndGet();
+                            //唤醒轮训的popRequest
                             wakeUp(first);
                         }
                         while (true);
