@@ -142,12 +142,15 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
     /**
      * on BackpressureForAsyncMode, limit maximum number of on-going sending async messages
      * default is 10000
+     * 后台异步发送最大积压的消息数量，默认10000
+     *
      */
     private int backPressureForAsyncSendNum = 10000;
 
     /**
      * on BackpressureForAsyncMode, limit maximum message size of on-going sending async messages
      * default is 100M
+     * 后台异步发送最大积压的消息大小，默认100M
      */
     private int backPressureForAsyncSendSize = 100 * 1024 * 1024;
 
