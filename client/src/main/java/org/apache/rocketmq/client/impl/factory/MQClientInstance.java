@@ -256,13 +256,13 @@ public class MQClientInstance {
                     if (null == this.clientConfig.getNamesrvAddr()) {
                         this.mQClientAPIImpl.fetchNameServerAddr();
                     }
-                    // Start request-response channel
+                    // Start request-response channel（启动请求-响应通道）
                     this.mQClientAPIImpl.start();
-                    // Start various schedule tasks
+                    // Start various schedule tasks（启动定时任务）
                     this.startScheduledTask();
-                    // Start pull service
+                    // Start pull service（启动pullMessageService)
                     this.pullMessageService.start();
-                    // Start rebalance service
+                    // Start rebalance service(启动负载均衡-consumer才会有负载均衡）
                     this.rebalanceService.start();
                     // Start push service
                     this.defaultMQProducer.getDefaultMQProducerImpl().start(false);
@@ -278,6 +278,7 @@ public class MQClientInstance {
     }
 
     private void startScheduledTask() {
+        //每2分钟获取nameServer地址
         if (null == this.clientConfig.getNamesrvAddr()) {
             this.scheduledExecutorService.scheduleAtFixedRate(() -> {
                 try {
@@ -287,7 +288,7 @@ public class MQClientInstance {
                 }
             }, 1000 * 10, 1000 * 60 * 2, TimeUnit.MILLISECONDS);
         }
-
+        //更新topic路由信息（默认30s)
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 MQClientInstance.this.updateTopicRouteInfoFromNameServer();
@@ -296,6 +297,7 @@ public class MQClientInstance {
             }
         }, 10, this.clientConfig.getPollNameServerInterval(), TimeUnit.MILLISECONDS);
 
+        //清除本地不在线的broker|向所有broker发送心跳地址（默认30s）
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 MQClientInstance.this.cleanOfflineBroker();
@@ -304,7 +306,7 @@ public class MQClientInstance {
                 log.error("ScheduledTask sendHeartbeatToAllBroker exception", e);
             }
         }, 1000, this.clientConfig.getHeartbeatBrokerInterval(), TimeUnit.MILLISECONDS);
-
+        //持久化consumeOffset(默认5秒）
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 MQClientInstance.this.persistAllConsumerOffset();
@@ -312,7 +314,7 @@ public class MQClientInstance {
                 log.error("ScheduledTask persistAllConsumerOffset exception", e);
             }
         }, 1000 * 10, this.clientConfig.getPersistConsumerOffsetInterval(), TimeUnit.MILLISECONDS);
-
+        //每一分钟调整线程池
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 MQClientInstance.this.adjustThreadPool();
@@ -991,6 +993,9 @@ public class MQClientInstance {
         return null;
     }
 
+    /**
+     * 通过brokerName从发布信息中获取broker地址
+     */
     public String findBrokerAddressInPublish(final String brokerName) {
         if (brokerName == null) {
             return null;

@@ -24,7 +24,8 @@ import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 
 /**
  * 故障转移策略（默认是没有开启的）
- * <li>broker不可用的时间就是根据latencyMax判断的，大于哪个下标，然后就从notAvailableDuration取不可用时间</li>
+ * <li>broker不可用的时间就是根据latencyMax判断的，大于哪个下标，然后就从notAvailableDuration取不可用时间。</li>
+ * <li>对于延迟时间为550L毫秒以下的，不可用时间都是0</li>
  */
 public class MQFaultStrategy {
     private final static Logger log = LoggerFactory.getLogger(MQFaultStrategy.class);
@@ -118,7 +119,7 @@ public class MQFaultStrategy {
      *
      * @param brokerName     broker名称
      * @param currentLatency 当前延迟时间
-     * @param isolation      是否隔离（true的时候，每个broker都有自己的不可用时间）
+     * @param isolation      是否隔离（true的时候，计算延迟时间为30秒，也就说明broker30秒不可用）
      */
     public void updateFaultItem(final String brokerName, final long currentLatency, boolean isolation) {
         //发送延迟故障启用(默认为false)
