@@ -104,7 +104,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     private final ConcurrentMap<String/* topic */, TopicPublishInfo> topicPublishInfoTable =
             new ConcurrentHashMap<>();
     /**
-     * 发送消息钩子函数，在发送之前，发送消息后都会执行钩子函数
+     * 发送消息钩子函数，在发送之前会执行sendMessageBefore方法，发送消息后会执行sendMessageAfter方法
      */
     private final ArrayList<SendMessageHook> sendMessageHookList = new ArrayList<>();
     /**
@@ -130,6 +130,9 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     protected ExecutorService checkExecutor;
     private ServiceState serviceState = ServiceState.CREATE_JUST;
     private MQClientInstance mQClientFactory;
+    /**
+     * 检查禁止的钩子函数
+     */
     private ArrayList<CheckForbiddenHook> checkForbiddenHookList = new ArrayList<>();
     /**
      * 故障转移策略
@@ -207,6 +210,10 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         semaphoreAsyncSendSize = new Semaphore(size, true);
     }
 
+    /**
+     * 初始化事务消息环境
+     * 这里其实就是给checkExecutor赋值，执行了就使用指定的，没有就根据参数new
+     */
     public void initTransactionEnv() {
         TransactionMQProducer producer = (TransactionMQProducer) this.defaultMQProducer;
         if (producer.getExecutorService() != null) {
