@@ -235,6 +235,9 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         }
     }
 
+    /**
+     * 注册发送消息钩子
+     */
     public void registerSendMessageHook(final SendMessageHook hook) {
         this.sendMessageHookList.add(hook);
         log.info("register sendMessage Hook, {}", hook.hookName());
@@ -1360,7 +1363,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
             throw new MQClientException("tranExecutor is null", null);
         }
 
-        // ignore DelayTimeLevel parameter
+        // ignore DelayTimeLevel parameter（事务消息不能是延迟级别消息）
         if (msg.getDelayTimeLevel() != 0) {
             MessageAccessor.clearProperty(msg, MessageConst.PROPERTY_DELAY_TIME_LEVEL);
         }
@@ -1392,6 +1395,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         localTransactionState = localTransactionExecuter.executeLocalTransactionBranch(msg, arg);
                     } else {
                         log.debug("Used new transaction API");
+                        //执行本地事务
                         localTransactionState = transactionListener.executeLocalTransaction(msg, arg);
                     }
                     if (null == localTransactionState) {
@@ -1462,23 +1466,27 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         requestHeader.setBname(destBrokerName);
         switch (localTransactionState) {
             case COMMIT_MESSAGE:
+                //提交事务
                 requestHeader.setCommitOrRollback(MessageSysFlag.TRANSACTION_COMMIT_TYPE);
                 break;
             case ROLLBACK_MESSAGE:
+                //回滚事务
                 requestHeader.setCommitOrRollback(MessageSysFlag.TRANSACTION_ROLLBACK_TYPE);
                 break;
             case UNKNOW:
+                //不知道本地事务状态
                 requestHeader.setCommitOrRollback(MessageSysFlag.TRANSACTION_NOT_TYPE);
                 break;
             default:
                 break;
         }
-
+        //执行本地事务钩子函数
         doExecuteEndTransactionHook(msg, sendResult.getMsgId(), brokerAddr, localTransactionState, false);
         requestHeader.setProducerGroup(this.defaultMQProducer.getProducerGroup());
         requestHeader.setTranStateTableOffset(sendResult.getQueueOffset());
         requestHeader.setMsgId(sendResult.getMsgId());
         String remark = localException != null ? ("executeLocalTransactionBranch exception: " + localException.toString()) : null;
+        //通知broker本地事务结果
         this.mQClientFactory.getMQClientAPIImpl().endTransactionOneway(brokerAddr, requestHeader, remark,
             this.defaultMQProducer.getSendMsgTimeout());
     }
