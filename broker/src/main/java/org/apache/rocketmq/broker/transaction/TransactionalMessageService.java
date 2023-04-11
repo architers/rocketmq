@@ -26,7 +26,6 @@ public interface TransactionalMessageService {
 
     /**
      * Process prepare message, in common, we should put this message to storage service.
-     *
      * @param messageInner Prepare(Half) message.
      * @return Prepare message storage result.
      */
