@@ -58,6 +58,9 @@ public class Broker2Client {
         this.brokerController = brokerController;
     }
 
+    /**
+     * 校验生产者事务消息状态
+     */
     public void checkProducerTransactionState(
         final String group,
         final Channel channel,

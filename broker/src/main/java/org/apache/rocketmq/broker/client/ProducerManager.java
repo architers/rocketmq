@@ -202,6 +202,9 @@ public class ProducerManager {
         }
     }
 
+    /**
+     * 轮训获取一个健康的Channel
+     */
     public Channel getAvailableChannel(String groupId) {
         if (groupId == null) {
             return null;
