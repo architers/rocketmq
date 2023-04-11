@@ -126,19 +126,26 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
         }
         OperationResult result = new OperationResult();
         if (MessageSysFlag.TRANSACTION_COMMIT_TYPE == requestHeader.getCommitOrRollback()) {
-            //提交事务消息
+            //得到half消息
             result = this.brokerController.getTransactionalMessageService().commitMessage(requestHeader);
             if (result.getResponseCode() == ResponseCode.SUCCESS) {
+                //校验half消息
                 RemotingCommand res = checkPrepareMessage(result.getPrepareMessage(), requestHeader);
                 if (res.getCode() == ResponseCode.SUCCESS) {
+                    //half消息转成的真正的业务topic消息，
                     MessageExtBrokerInner msgInner = endMessageTransaction(result.getPrepareMessage());
                     msgInner.setSysFlag(MessageSysFlag.resetTransactionValue(msgInner.getSysFlag(), requestHeader.getCommitOrRollback()));
                     msgInner.setQueueOffset(requestHeader.getTranStateTableOffset());
                     msgInner.setPreparedTransactionOffset(requestHeader.getCommitLogOffset());
                     msgInner.setStoreTimestamp(result.getPrepareMessage().getStoreTimestamp());
                     MessageAccessor.clearProperty(msgInner, MessageConst.PROPERTY_TRANSACTION_PREPARED);
+
+                    //将真正的业务topic消息再保存到commitLog（后续消息怎么consumeQueue,怎么消费就跟普通的topic一致了）
                     RemotingCommand sendResult = sendFinalMessage(msgInner);
+
+
                     if (sendResult.getCode() == ResponseCode.SUCCESS) {
+                        //将消息发到真的topic(事务已经提交），删除half消息
                         this.brokerController.getTransactionalMessageService().deletePrepareMessage(result.getPrepareMessage());
                     }
                     return sendResult;
@@ -227,9 +234,9 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
             switch (putMessageResult.getPutMessageStatus()) {
                 // Success
                 case PUT_OK:
-                case FLUSH_DISK_TIMEOUT:
-                case FLUSH_SLAVE_TIMEOUT:
-                case SLAVE_NOT_AVAILABLE:
+                case FLUSH_DISK_TIMEOUT://刷新磁盘超时
+                case FLUSH_SLAVE_TIMEOUT://刷新到从节点超时
+                case SLAVE_NOT_AVAILABLE://总节点不存在
                     response.setCode(ResponseCode.SUCCESS);
                     response.setRemark(null);
                     break;
