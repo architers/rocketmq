@@ -109,6 +109,9 @@ public class TransactionalMessageBridge {
             mq.getQueueId(), offset);
     }
 
+    /**
+     * 获取事务halfMessage,这里跟普通消息的区别就是这里指定了消费组、topic、订阅consumeQueue中所有的数据
+     */
     public PullResult getHalfMessage(int queueId, long offset, int nums) {
         String group = TransactionalMessageUtil.buildConsumerGroup();
         String topic = TransactionalMessageUtil.buildHalfTopic();
@@ -325,6 +328,7 @@ public class TransactionalMessageBridge {
     }
 
     public boolean writeOp(Integer queueId,Message message) {
+        //获取事务消息Op队列，没有就new,有就用已经存在的
         MessageQueue opQueue = opQueueMap.get(queueId);
         if (opQueue == null) {
             opQueue = getOpQueueByHalf(queueId, this.brokerController.getBrokerConfig().getBrokerName());
@@ -333,7 +337,7 @@ public class TransactionalMessageBridge {
                 opQueue = oldQueue;
             }
         }
-
+        //将事务消息操作写入RMQ_SYS_TRANS_OP_HALF_TOPIC中
         PutMessageResult result = putMessageReturnResult(makeOpMessageInner(message, opQueue));
         if (result != null && result.getPutMessageStatus() == PutMessageStatus.PUT_OK) {
             return true;
@@ -342,6 +346,9 @@ public class TransactionalMessageBridge {
         return false;
     }
 
+    /**
+     * 获取事务操作的消息队列
+     */
     private MessageQueue getOpQueueByHalf(Integer queueId, String brokerName) {
         MessageQueue opQueue = new MessageQueue();
         opQueue.setTopic(TransactionalMessageUtil.buildOpTopic());

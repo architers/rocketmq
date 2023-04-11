@@ -53,6 +53,9 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
 
     private TransactionalMessageBridge transactionalMessageBridge;
 
+    /**
+     * bug:拉取次数命名成拉取重试次数
+     */
     private static final int PULL_MSG_RETRY_NUMBER = 1;
 
     private static final int MAX_PROCESS_TIME_LIMIT = 60000;
@@ -72,6 +75,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
 
     public TransactionalMessageServiceImpl(TransactionalMessageBridge transactionBridge) {
         this.transactionalMessageBridge = transactionBridge;
+        //启动批量操作事务消息的线程
         transactionalOpBatchService = new TransactionalOpBatchService(transactionalMessageBridge.getBrokerController(), this);
         transactionalOpBatchService.start();
     }
@@ -79,14 +83,20 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
 
     @Override
     public CompletableFuture<PutMessageResult> asyncPrepareMessage(MessageExtBrokerInner messageInner) {
+        //异步put事务的half消息到commitLog
         return transactionalMessageBridge.asyncPutHalfMessage(messageInner);
     }
 
     @Override
     public PutMessageResult prepareMessage(MessageExtBrokerInner messageInner) {
+        //同步put事务的half消息到commitLog
         return transactionalMessageBridge.putHalfMessage(messageInner);
     }
 
+    /**
+     * 判断是否需要丢弃
+     * 每校验一次，就会将事务消息校验的次数+1
+     */
     private boolean needDiscard(MessageExt msgExt, int transactionCheckMax) {
         String checkTimes = msgExt.getProperty(MessageConst.PROPERTY_TRANSACTION_CHECK_TIMES);
         int checkTime = 1;
@@ -102,6 +112,9 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
         return false;
     }
 
+    /**
+     * 判断事务消息出生时间是否大于FileReservedTime
+     */
     private boolean needSkip(MessageExt msgExt) {
         long valueOfCurrentMinusBorn = System.currentTimeMillis() - msgExt.getBornTimestamp();
         if (valueOfCurrentMinusBorn
@@ -144,7 +157,9 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
     public void check(long transactionTimeout, int transactionCheckMax,
         AbstractTransactionalMessageCheckListener listener) {
         try {
+            //获取half消息的主题
             String topic = TopicValidator.RMQ_SYS_TRANS_HALF_TOPIC;
+            //half消息主题的消息队列
             Set<MessageQueue> msgQueues = transactionalMessageBridge.fetchMessageQueues(topic);
             if (msgQueues == null || msgQueues.size() == 0) {
                 log.warn("The queue of topic is empty :" + topic);
@@ -154,6 +169,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
             for (MessageQueue messageQueue : msgQueues) {
                 long startTime = System.currentTimeMillis();
                 MessageQueue opQueue = getOpQueue(messageQueue);
+                //得到half消息的consumeOffset
                 long halfOffset = transactionalMessageBridge.fetchConsumeOffset(messageQueue);
                 long opOffset = transactionalMessageBridge.fetchConsumeOffset(opQueue);
                 log.info("Before check, the queue={} msgOffset={} opOffset={}", messageQueue, halfOffset, opOffset);
@@ -162,10 +178,11 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                         halfOffset, opOffset);
                     continue;
                 }
-
+                //处理过的opQueue的offset
                 List<Long> doneOpOffset = new ArrayList<>();
-                HashMap<Long, Long> removeMap = new HashMap<>();
+                HashMap<Long/*halfOffset*/, Long/*opOffset*/> removeMap = new HashMap<>();
                 HashMap<Long, HashSet<Long>> opMsgMap = new HashMap<Long, HashSet<Long>>();
+                // 将已处理但未更新的消息保存到removeMap中，后续进行判断时需要
                 PullResult pullResult = fillOpRemoveMap(removeMap, opQueue, opOffset, halfOffset, opMsgMap, doneOpOffset);
                 if (null == pullResult) {
                     log.error("The queue={} check msgOffset={} with opOffset={} failed, pullResult is null",
@@ -197,14 +214,17 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                         GetResult getResult = getHalfMsg(messageQueue, i);
                         MessageExt msgExt = getResult.getMsg();
                         if (msgExt == null) {
+                            //获取null的参数>halfMessage为空最大重试次数，跳出while(true)
                             if (getMessageNullCount++ > MAX_RETRY_COUNT_WHEN_HALF_NULL) {
                                 break;
                             }
+                            //没有halfMessage,跳出while(true)
                             if (getResult.getPullResult().getPullStatus() == PullStatus.NO_NEW_MSG) {
                                 log.debug("No new msg, the miss offset={} in={}, continue check={}, pull result={}", i,
                                     messageQueue, getMessageNullCount, getResult.getPullResult());
                                 break;
                             } else {
+                                //获取到消息，但是消息内容为空，跳出这次循环（TODO3为啥会为空）
                                 log.info("Illegal offset, the miss offset={} in={}, continue check={}, pull result={}",
                                     i, messageQueue, getMessageNullCount, getResult.getPullResult());
                                 i = getResult.getPullResult().getNextBeginOffset();
@@ -212,7 +232,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                                 continue;
                             }
                         }
-
+                        //TODO2
                         if (this.transactionalMessageBridge.getBrokerController().getBrokerConfig().isEnableSlaveActingMaster()
                             && this.transactionalMessageBridge.getBrokerController().getMinBrokerIdInGroup()
                             == this.transactionalMessageBridge.getBrokerController().getBrokerIdentity().getBrokerId()
@@ -241,7 +261,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                             }
                             continue;
                         }
-
+                        //如果check次数超过check最大次数，或者这个消息已经超过fileReservedTime，就把message转换到TRANS_CHECK_MAX_TIME_TOPIC
                         if (needDiscard(msgExt, transactionCheckMax) || needSkip(msgExt)) {
                             listener.resolveDiscardMsg(msgExt);
                             newOffset = i + 1;
@@ -455,7 +475,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
     }
 
     /**
-     * Write messageExt to Half topic again
+     * Write messageExt to Half topic again（再次将half消息写入对应的topic）
      *
      * @param messageExt Message will be write back to queue
      * @return Put result can used to determine the specific results of storage.
@@ -575,6 +595,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
         return response;
     }
 
+
     @Override
     public boolean deletePrepareMessage(MessageExt messageExt) {
         Integer queueId = messageExt.getQueueId();
@@ -589,20 +610,24 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
 
         String data = messageExt.getQueueOffset() + TransactionalMessageUtil.OFFSET_SEPARATOR;
         try {
+            //向contextQueue队列中增加一条删除数据消息的数据
             boolean res = mqContext.getContextQueue().offer(data, 100, TimeUnit.MILLISECONDS);
             if (res) {
                 int totalSize = mqContext.getTotalSize().addAndGet(data.length());
+                //当大小超过限定，就唤醒transactionalOpBatchService线程（唤醒了就会writeOp)
                 if (totalSize > transactionalMessageBridge.getBrokerController().getBrokerConfig().getTransactionOpMsgMaxSize()) {
                     this.transactionalOpBatchService.wakeup();
                 }
                 return true;
             } else {
+                //队列满了直接唤醒
                 this.transactionalOpBatchService.wakeup();
             }
         } catch (InterruptedException ignore) {
         }
-
+        //刚这条消息没有放入到队列中，无法在transactionalOpBatchService进行writeOp，就补充writeOp
         Message msg = getOpMessage(queueId, data);
+        //向RMQ_SYS_TRANS_OP_HALF_TOPIC写一条数据（格式是queueOffset用英文逗号拼接）
         if (this.transactionalMessageBridge.writeOp(queueId, msg)) {
             log.warn("Force add remove op data. queueId={}", queueId);
             return true;
@@ -680,11 +705,12 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
             long firstTimestamp = startTime;
             Map<Integer, Message> sendMap = null;
             long interval = transactionalMessageBridge.getBrokerController().getBrokerConfig().getTransactionOpBatchInterval();
+            //获取事务操作最大的消息大小
             int maxSize = transactionalMessageBridge.getBrokerController().getBrokerConfig().getTransactionOpMsgMaxSize();
             boolean overSize = false;
             for (Map.Entry<Integer, MessageQueueOpContext> entry : deleteContext.entrySet()) {
                 MessageQueueOpContext mqContext = entry.getValue();
-                //no msg in contextQueue
+                //no msg in contextQueue（没有删除的消息，直接返回）
                 if (mqContext.getTotalSize().get() <= 0 || mqContext.getContextQueue().size() == 0 ||
                         // wait for the interval
                         mqContext.getTotalSize().get() < maxSize &&

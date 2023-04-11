@@ -2117,9 +2117,9 @@ public class BrokerController {
                 brokerAttachedPlugin.statusChanged(shouldStart);
             }
         }
-
+        //改变定时任务(延迟级别的定时任务)启动状态
         changeScheduleServiceStatus(shouldStart);
-
+        //改变事务消息check状态（true会开一个线程，固定时间去check事务消息）
         changeTransactionCheckServiceStatus(shouldStart);
 
         if (this.ackMessageProcessor != null) {

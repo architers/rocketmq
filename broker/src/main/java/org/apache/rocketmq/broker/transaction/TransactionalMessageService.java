@@ -41,6 +41,7 @@ public interface TransactionalMessageService {
 
     /**
      * Delete prepare message when this message has been committed or rolled back.
+     * 提交或回滚此消息后删除准备消息(half消息）,其实就是writeOp操作
      *
      * @param messageExt
      */

@@ -36,7 +36,7 @@ public abstract class AbstractTransactionalMessageCheckListener {
 
     private BrokerController brokerController;
 
-    //queue nums of topic TRANS_CHECK_MAX_TIME_TOPIC
+    //queue nums of topic TRANS_CHECK_MAX_TIME_TOPIC（TRANS_CHECK_MAX_TIME_TOPIC的queue数量）
     protected final static int TCMT_QUEUE_NUMS = 1;
 
     private static volatile ExecutorService executorService;
@@ -48,6 +48,9 @@ public abstract class AbstractTransactionalMessageCheckListener {
         this.brokerController = brokerController;
     }
 
+    /**
+     *向客户端发送检验本地事务的消息
+     */
     public void sendCheckMessage(MessageExt msgExt) throws Exception {
         CheckTransactionStateRequestHeader checkTransactionStateRequestHeader = new CheckTransactionStateRequestHeader();
         checkTransactionStateRequestHeader.setCommitLogOffset(msgExt.getCommitLogOffset());
@@ -60,6 +63,7 @@ public abstract class AbstractTransactionalMessageCheckListener {
         msgExt.setQueueId(Integer.parseInt(msgExt.getUserProperty(MessageConst.PROPERTY_REAL_QUEUE_ID)));
         msgExt.setStoreSize(0);
         String groupId = msgExt.getProperty(MessageConst.PROPERTY_PRODUCER_GROUP);
+        //轮训获取一个有效的Channel
         Channel channel = brokerController.getProducerManager().getAvailableChannel(groupId);
         if (channel != null) {
             brokerController.getBroker2Client().checkProducerTransactionState(groupId, channel, checkTransactionStateRequestHeader, msgExt);
@@ -68,6 +72,9 @@ public abstract class AbstractTransactionalMessageCheckListener {
         }
     }
 
+    /**
+     * 异步向生成者发送校验本地事务状态的消息
+     */
     public void resolveHalfMsg(final MessageExt msgExt) {
         if (executorService != null) {
             executorService.execute(new Runnable() {
@@ -114,7 +121,7 @@ public abstract class AbstractTransactionalMessageCheckListener {
 
     /**
      * In order to avoid check back unlimited, we will discard the message that have been checked more than a certain
-     * number of times.
+     * number of times（为了避免无限制的校验，我们将丢弃已检查超过一定次数的消息）
      *
      * @param msgExt Message to be discarded.
      */
