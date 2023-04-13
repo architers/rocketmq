@@ -122,8 +122,13 @@ public class MessageStoreConfig {
 
     private int maxRecoveryCommitlogFiles = 30;
 
+    /**
+     * 当磁盘使用率到达多大的时候警告
+     */
     private int diskSpaceWarningLevelRatio = 90;
-
+    /**
+     * 强制清理磁盘空间使用率（当磁盘使用率到达多大的时候会强制删除）
+     */
     private int diskSpaceCleanForciblyRatio = 85;
 
     /**
@@ -140,7 +145,7 @@ public class MessageStoreConfig {
     private int cleanResourceInterval = 10000;
     // CommitLog removal interval
     private int deleteCommitLogFilesInterval = 100;
-    // ConsumeQueue removal interval
+    // ConsumeQueue removal interval（删除consume队列文件间隔）
     private int deleteConsumeQueueFilesInterval = 100;
     private int destroyMapedFileIntervalForcibly = 1000 * 120;
     private int redeleteHangedFileInterval = 1000 * 120;
@@ -211,6 +216,9 @@ public class MessageStoreConfig {
     private int slaveTimeout = 3000;
     private String messageDelayLevel = "1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h";
     private long flushDelayOffsetInterval = 1000 * 10;
+    /**
+     * 是否强制清理文件
+     */
     @ImportantField
     private boolean cleanFileForciblyEnable = true;
     private boolean warmMapedFileEnable = false;
@@ -356,8 +364,14 @@ public class MessageStoreConfig {
      */
     private long maxChecksumRange = 1024 * 1024 * 1024;
 
+    /**
+     * TODO1
+     */
     private int replicasPerDiskPartition = 1;
 
+    /**
+     * 逻辑磁盘空间清理强制阈值
+     */
     private double logicalDiskSpaceCleanForciblyThreshold = 0.8;
 
     private long maxSlaveResendLength = 256 * 1024 * 1024;

@@ -394,11 +394,11 @@ public class MappedFileQueue implements Swappable {
                     if (mappedFile.destroy(intervalForcibly)) {
                         files.add(mappedFile);
                         deleteCount++;
-
+                        //一次删除不能超过限制
                         if (files.size() >= deleteFileBatchMax) {
                             break;
                         }
-
+                        //隔一段时间删除一次
                         if (deleteFilesInterval > 0 && (i + 1) < mfsLength) {
                             try {
                                 Thread.sleep(deleteFilesInterval);
