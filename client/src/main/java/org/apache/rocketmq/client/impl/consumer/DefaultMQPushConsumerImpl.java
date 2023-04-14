@@ -193,8 +193,14 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         this.mQClientFactory.getMQAdminImpl().createTopic(key, newTopic, queueNum, topicSysFlag, null);
     }
 
+
+    /**
+     *获取订阅的消息队列
+     */
     public Set<MessageQueue> fetchSubscribeMessageQueues(String topic) throws MQClientException {
+        //1.从消费的负载均衡实现中获取订阅的消息队列信息
         Set<MessageQueue> result = this.rebalanceImpl.getTopicSubscribeInfoTable().get(topic);
+        //2.没有（刚订阅的时候是没有的）就从nameServer获取，重复第一步
         if (null == result) {
             this.mQClientFactory.updateTopicRouteInfoFromNameServer(topic);
             result = this.rebalanceImpl.getTopicSubscribeInfoTable().get(topic);
@@ -203,10 +209,14 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         if (null == result) {
             throw new MQClientException("The topic[" + topic + "] not exist", null);
         }
-
+        //解析订阅的消息队列
         return parseSubscribeMessageQueues(result);
     }
 
+    /**
+     * 解析订阅的消息队列
+     * 会将Namespace和topic拼接
+     */
     public Set<MessageQueue> parseSubscribeMessageQueues(Set<MessageQueue> messageQueueList) {
         Set<MessageQueue> resultQueues = new HashSet<>();
         for (MessageQueue queue : messageQueueList) {
@@ -249,7 +259,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         }
 
         pullRequest.getProcessQueue().setLastPullTimestamp(System.currentTimeMillis());
-
+        //确保consume是running状态才拉取消息,否则就稍后再拉取（默认3s)
         try {
             this.makeSureStateOK();
         } catch (MQClientException e) {
@@ -258,6 +268,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
             return;
         }
 
+        //如果当前消费者暂停，就过一段时间(默认一秒)再执行pullRequest
         if (this.isPause()) {
             log.warn("consumer was paused, execute pull request later. instanceName={}, group={}", this.defaultMQPushConsumer.getInstanceName(), this.defaultMQPushConsumer.getConsumerGroup());
             this.executePullRequestLater(pullRequest, PULL_TIME_DELAY_MILLS_WHEN_SUSPEND);
