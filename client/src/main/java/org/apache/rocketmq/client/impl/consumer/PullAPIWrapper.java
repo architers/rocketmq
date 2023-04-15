@@ -214,6 +214,7 @@ public class PullAPIWrapper {
             }
             int sysFlagInner = sysFlag;
 
+            //从节点拉取的，就不提交offset
             if (findBrokerResult.isSlave()) {
                 sysFlagInner = PullSysFlag.clearCommitOffsetFlag(sysFlagInner);
             }
