@@ -30,10 +30,11 @@ public class AllocateMessageQueueAveragely extends AbstractAllocateMessageQueueS
         List<String> cidAll) {
 
         List<MessageQueue> result = new ArrayList<>();
+        //判断是否能够分配，只有本地的consumeGroup注册到broker,broker的保存的客户端ID包含当前的clientId才能分配
         if (!check(consumerGroup, currentCID, mqAll, cidAll)) {
             return result;
         }
-
+        //假设有4个队列，两个消费者，这个cid排第一个，那么分配的就是1和2
         int index = cidAll.indexOf(currentCID);
         int mod = mqAll.size() % cidAll.size();
         int averageSize =
