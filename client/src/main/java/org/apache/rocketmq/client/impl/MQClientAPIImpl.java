@@ -319,6 +319,9 @@ public class MQClientAPIImpl implements NameServerUpdateCallback {
         this.remotingClient.shutdown();
     }
 
+    /**
+     *查询topic的队列分配
+     */
     public Set<MessageQueueAssignment> queryAssignment(final String addr, final String topic,
         final String consumerGroup, final String clientId, final String strategyName,
         final MessageModel messageModel, final long timeoutMillis)

@@ -80,7 +80,7 @@ public class ClientRemotingProcessor implements NettyRequestProcessor {
 
             case RequestCode.GET_CONSUMER_RUNNING_INFO:
                 return this.getConsumerRunningInfo(ctx, request);
-
+            //直接消费消息
             case RequestCode.CONSUME_MESSAGE_DIRECTLY:
                 return this.consumeMessageDirectly(ctx, request);
 

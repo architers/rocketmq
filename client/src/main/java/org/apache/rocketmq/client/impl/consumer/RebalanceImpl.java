@@ -46,14 +46,22 @@ import org.apache.rocketmq.remoting.protocol.heartbeat.SubscriptionData;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 
+/**
+ * 消费端负载均衡
+ */
 public abstract class RebalanceImpl {
     protected static final Logger log = LoggerFactory.getLogger(RebalanceImpl.class);
 
     protected final ConcurrentMap<MessageQueue, ProcessQueue> processQueueTable = new ConcurrentHashMap<>(64);
     protected final ConcurrentMap<MessageQueue, PopProcessQueue> popProcessQueueTable = new ConcurrentHashMap<>(64);
-
+    /**
+     * topic对应所有的读队列信息
+     */
     protected final ConcurrentMap<String/* topic */, Set<MessageQueue>> topicSubscribeInfoTable =
         new ConcurrentHashMap<>();
+    /**
+     * topic对应的数据（tag|sql）
+     */
     protected final ConcurrentMap<String /* topic */, SubscriptionData> subscriptionInner =
         new ConcurrentHashMap<>();
     protected String consumerGroup;
@@ -63,7 +71,13 @@ public abstract class RebalanceImpl {
     private static final int TIMEOUT_CHECK_TIMES = 3;
     private static final int QUERY_ASSIGNMENT_TIMEOUT = 3000;
 
+    /**
+     * broker端负载均衡信息
+     */
     private Map<String, String> topicBrokerRebalance = new ConcurrentHashMap<>();
+    /**
+     * 客户端的负载均衡信息
+     */
     private Map<String, String> topicClientRebalance = new ConcurrentHashMap<>();
 
     public RebalanceImpl(String consumerGroup, MessageModel messageModel,
@@ -75,6 +89,9 @@ public abstract class RebalanceImpl {
         this.mQClientFactory = mQClientFactory;
     }
 
+    /**
+     * 解锁消息队列
+     */
     public void unlock(final MessageQueue mq, final boolean oneway) {
         FindBrokerResult findBrokerResult = this.mQClientFactory.findBrokerAddressInSubscribe(this.mQClientFactory.getBrokerNameFromMessageQueue(mq), MixAll.MASTER_ID, true);
         if (findBrokerResult != null) {
@@ -95,6 +112,9 @@ public abstract class RebalanceImpl {
         }
     }
 
+    /**
+     * 解锁订阅的所有的MessageQueue
+     */
     public void unlockAll(final boolean oneway) {
         HashMap<String, Set<MessageQueue>> brokerMqs = this.buildProcessQueueTableByBrokerName();
 
@@ -184,6 +204,9 @@ public abstract class RebalanceImpl {
         return false;
     }
 
+    /**
+     * 锁着订阅所有的消息队列，锁成功就setLocked（true)，否则false
+     */
     public void lockAll() {
         HashMap<String, Set<MessageQueue>> brokerMqs = this.buildProcessQueueTableByBrokerName();
 
@@ -230,20 +253,27 @@ public abstract class RebalanceImpl {
         }
     }
 
+    /**
+     * 判断topic是否客户端负载均衡
+     */
     public boolean clientRebalance(String topic) {
         return true;
     }
 
     public boolean doRebalance(final boolean isOrder) {
         boolean balanced = true;
+        //得到订阅关系
         Map<String, SubscriptionData> subTable = this.getSubscriptionInner();
         if (subTable != null) {
             for (final Map.Entry<String, SubscriptionData> entry : subTable.entrySet()) {
                 final String topic = entry.getKey();
                 try {
+                    //如果不是客户端负载，而且能够查询到分配
                     if (!clientRebalance(topic) && tryQueryAssignment(topic)) {
+                        //broker端进行负载
                         balanced = this.getRebalanceResultFromBroker(topic, isOrder);
                     } else {
+                        //通过topic负载（在客户端自己进行负载）
                         balanced = this.rebalanceByTopic(topic, isOrder);
                     }
                 } catch (Throwable e) {
@@ -300,6 +330,7 @@ public abstract class RebalanceImpl {
         boolean balanced = true;
         switch (messageModel) {
             case BROADCASTING: {
+                //得到topic的消息队列集合
                 Set<MessageQueue> mqSet = this.topicSubscribeInfoTable.get(topic);
                 if (mqSet != null) {
                     boolean changed = this.updateProcessQueueTableInRebalance(topic, mqSet, isOrder);
@@ -316,6 +347,7 @@ public abstract class RebalanceImpl {
                 break;
             }
             case CLUSTERING: {
+                //得到topic所有的messageQueue(读队列),
                 Set<MessageQueue> mqSet = this.topicSubscribeInfoTable.get(topic);
                 List<String> cidAll = this.mQClientFactory.findConsumerIdList(topic, consumerGroup);
                 if (null == mqSet) {
@@ -354,7 +386,7 @@ public abstract class RebalanceImpl {
                     if (allocateResult != null) {
                         allocateResultSet.addAll(allocateResult);
                     }
-
+                    //重负载后更新ProcessQueue
                     boolean changed = this.updateProcessQueueTableInRebalance(topic, allocateResultSet, isOrder);
                     if (changed) {
                         log.info(
@@ -511,16 +543,19 @@ public abstract class RebalanceImpl {
         boolean allMQLocked = true;
         List<PullRequest> pullRequestList = new ArrayList<>();
         for (MessageQueue mq : mqSet) {
+            //processQueueTable，就说明负载到了新的MessageQueue
             if (!this.processQueueTable.containsKey(mq)) {
                 if (isOrder && !this.lock(mq)) {
                     log.warn("doRebalance, {}, add a new mq failed, {}, because lock failed", consumerGroup, mq);
                     allMQLocked = false;
                     continue;
                 }
-
+                //移除脏的消费的offset信息（一直在负载，如果不移除，就会从老的offset消费->以同一个topic为例子，最开始分配到1消费的offset为100，
+                // 这个时候负载messageQueue1被其他分配，真实的消费的Offset到了1万，再过一段时间，1又被当前分到，就会又从1消费）
                 this.removeDirtyOffset(mq);
                 ProcessQueue pq = createProcessQueue(topic);
                 pq.setLocked(true);
+                //计算下一次拉取的offset(对于集群默认三种没有过时的FromWhere都是从broker获取消费的offset)
                 long nextOffset = this.computePullFromWhere(mq);
                 if (nextOffset >= 0) {
                     ProcessQueue pre = this.processQueueTable.putIfAbsent(mq, pq);
@@ -546,7 +581,9 @@ public abstract class RebalanceImpl {
         if (!allMQLocked) {
             mQClientFactory.rebalanceLater(500);
         }
-
+        /*
+         * 负载到新的队列，就转发pullRequest
+         */
         this.dispatchPullRequest(pullRequestList, 500);
 
         return changed;

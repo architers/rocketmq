@@ -655,7 +655,7 @@ public class MQClientInstance {
                                 }
                             }
 
-                            // Update sub info（更新消费者订阅关系）
+                            // Update sub info（更新消费者订阅信息，也就是一个topic有哪些读的队列）
                             if (!consumerTable.isEmpty()) {
                                 Set<MessageQueue> subscribeInfo = topicRouteData2TopicSubscribeInfo(topic, topicRouteData);
                                 for (Entry<String, MQConsumerInner> entry : this.consumerTable.entrySet()) {
@@ -1064,6 +1064,9 @@ public class MQClientInstance {
         return 0;
     }
 
+    /**
+     * 根据消费组获取指定topic的consumeId集合
+     */
     public List<String> findConsumerIdList(final String topic, final String group) {
         String brokerAddr = this.findBrokerAddrByTopic(topic);
         if (null == brokerAddr) {
@@ -1207,6 +1210,9 @@ public class MQClientInstance {
         return topicRouteTable;
     }
 
+    /**
+     * 直接消费（在mq控制台上，可以点击重新发送，就是调用的这个接口，进行消费数据的）
+     */
     public ConsumeMessageDirectlyResult consumeMessageDirectly(final MessageExt msg,
                                                                final String consumerGroup,
                                                                final String brokerName) {

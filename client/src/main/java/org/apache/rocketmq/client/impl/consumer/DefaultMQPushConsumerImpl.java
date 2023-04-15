@@ -278,16 +278,22 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         long cachedMessageCount = processQueue.getMsgCount().get();
         long cachedMessageSizeInMiB = processQueue.getMsgSize().get() / (1024 * 1024);
 
+        /*
+         * 本地消息缓存的数量>队列的拉取数量阈值(默认1000),就稍后再拉取（默认50ms）
+         */
         if (cachedMessageCount > this.defaultMQPushConsumer.getPullThresholdForQueue()) {
             this.executePullRequestLater(pullRequest, PULL_TIME_DELAY_MILLS_WHEN_CACHE_FLOW_CONTROL);
             if ((queueFlowControlTimes++ % 1000) == 0) {
+                //流控次数达到一千次，就打印一次警告日志
                 log.warn(
                     "the cached message count exceeds the threshold {}, so do flow control, minOffset={}, maxOffset={}, count={}, size={} MiB, pullRequest={}, flowControlTimes={}",
                     this.defaultMQPushConsumer.getPullThresholdForQueue(), processQueue.getMsgTreeMap().firstKey(), processQueue.getMsgTreeMap().lastKey(), cachedMessageCount, cachedMessageSizeInMiB, pullRequest, queueFlowControlTimes);
             }
             return;
         }
-
+        /*
+         * 本地消息缓存的大小>队列的拉取大小阈值(默认100M),就稍后再拉取（默认50ms）
+         */
         if (cachedMessageSizeInMiB > this.defaultMQPushConsumer.getPullThresholdSizeForQueue()) {
             this.executePullRequestLater(pullRequest, PULL_TIME_DELAY_MILLS_WHEN_CACHE_FLOW_CONTROL);
             if ((queueFlowControlTimes++ % 1000) == 0) {
@@ -299,6 +305,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         }
 
         if (!this.consumeOrderly) {
+            //并发消费的offset跨度>配置的并发消费跨度（默认2000），就稍后拉取（50ms）
             if (processQueue.getMaxSpan() > this.defaultMQPushConsumer.getConsumeConcurrentlyMaxSpan()) {
                 this.executePullRequestLater(pullRequest, PULL_TIME_DELAY_MILLS_WHEN_CACHE_FLOW_CONTROL);
                 if ((queueMaxSpanFlowControlTimes++ % 1000) == 0) {
@@ -319,6 +326,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                             throw new MQClientException(ResponseCode.SYSTEM_ERROR, "Unexpected offset " + offset);
                         }
                     } catch (Exception e) {
+                        //异常就稍后在拉取（默认3s)
                         this.executePullRequestLater(pullRequest, pullTimeDelayMillsWhenException);
                         log.error("Failed to compute pull offset, pullResult: {}", pullRequest, e);
                         return;
@@ -362,15 +370,17 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                             long prevRequestOffset = pullRequest.getNextOffset();
                             pullRequest.setNextOffset(pullResult.getNextBeginOffset());
                             long pullRT = System.currentTimeMillis() - beginTimestamp;
+                            //增加pullRT
                             DefaultMQPushConsumerImpl.this.getConsumerStatsManager().incPullRT(pullRequest.getConsumerGroup(),
                                 pullRequest.getMessageQueue().getTopic(), pullRT);
 
                             long firstMsgOffset = Long.MAX_VALUE;
                             if (pullResult.getMsgFoundList() == null || pullResult.getMsgFoundList().isEmpty()) {
+                                //拉取的消息为空，就立即再拉取
                                 DefaultMQPushConsumerImpl.this.executePullRequestImmediately(pullRequest);
                             } else {
                                 firstMsgOffset = pullResult.getMsgFoundList().get(0).getQueueOffset();
-
+                                //增加PullTPS
                                 DefaultMQPushConsumerImpl.this.getConsumerStatsManager().incPullTPS(pullRequest.getConsumerGroup(),
                                     pullRequest.getMessageQueue().getTopic(), pullResult.getMsgFoundList().size());
 
@@ -454,6 +464,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
 
         boolean commitOffsetEnable = false;
         long commitOffsetValue = 0L;
+        //集群模式下，从本地获取消费的offset,如果>0，就在pull请求中提交消费的offset
         if (MessageModel.CLUSTERING == this.defaultMQPushConsumer.getMessageModel()) {
             commitOffsetValue = this.offsetStore.readOffset(pullRequest.getMessageQueue(), ReadOffsetType.READ_FROM_MEMORY);
             if (commitOffsetValue > 0) {
@@ -746,17 +757,22 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
     }
 
 
+    /**
+     * 消息重回队列
+     */
     private void sendMessageBack(MessageExt msg, int delayLevel, final String brokerName, final MessageQueue mq)
         throws RemotingException, MQBrokerException, InterruptedException, MQClientException {
         boolean needRetry = true;
         try {
             if (brokerName != null && brokerName.startsWith(MixAll.LOGICAL_QUEUE_MOCK_BROKER_PREFIX)
                 || mq != null && mq.getBrokerName().startsWith(MixAll.LOGICAL_QUEUE_MOCK_BROKER_PREFIX)) {
+                //逻辑队列模拟broker前缀不需要重试
                 needRetry = false;
                 sendMessageBackAsNormalMessage(msg);
             } else {
                 String brokerAddr = (null != brokerName) ? this.mQClientFactory.findBrokerAddressInPublish(brokerName)
                     : RemotingHelper.parseSocketAddressAddr(msg.getStoreHost());
+                //将消息重回对列
                 this.mQClientFactory.getMQClientAPIImpl().consumerSendMessageBack(brokerAddr, brokerName, msg,
                     this.defaultMQPushConsumer.getConsumerGroup(), delayLevel, 5000, getMaxReconsumeTimes());
             }
@@ -764,6 +780,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
             log.error("Failed to send message back, consumerGroup={}, brokerName={}, mq={}, message={}",
                 this.defaultMQPushConsumer.getConsumerGroup(), brokerName, mq, msg, t);
             if (needRetry) {
+                //异常重试
                 sendMessageBackAsNormalMessage(msg);
             }
         } finally {
@@ -893,6 +910,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 break;
             case RUNNING:
                 this.consumeMessageService.shutdown(awaitTerminateMillis);
+                //持久化consumerOffset
                 this.persistConsumerOffset();
                 this.mQClientFactory.unregisterConsumer(this.defaultMQPushConsumer.getConsumerGroup());
                 this.mQClientFactory.shutdown();
@@ -1373,6 +1391,9 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         }
     }
 
+    /**
+     * 持久化消费的offset
+     */
     @Override
     public void persistConsumerOffset() {
         try {
