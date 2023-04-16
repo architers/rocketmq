@@ -48,7 +48,7 @@ public class SubscriptionGroupManager extends ConfigManager {
     /**
      * 禁止的订阅组信息
      */
-    private ConcurrentMap<String, ConcurrentMap<String, Integer>> forbiddenTable =
+    private ConcurrentMap<String/*消费组名称*/, ConcurrentMap<String/*topic*/, Integer>> forbiddenTable =
         new ConcurrentHashMap<>(4);
 
     private final DataVersion dataVersion = new DataVersion();

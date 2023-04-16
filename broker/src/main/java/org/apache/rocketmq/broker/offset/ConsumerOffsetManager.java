@@ -45,8 +45,9 @@ public class ConsumerOffsetManager extends ConfigManager {
 
     private DataVersion dataVersion = new DataVersion();
 
-    private ConcurrentMap<String/* topic@group */, ConcurrentMap<Integer, Long>> offsetTable =
-        new ConcurrentHashMap<>(512);
+    private ConcurrentMap<String/* topic@group */, ConcurrentMap<Integer/*queueId*/, Long
+            /*消费偏移量*/>>
+    offsetTable = new ConcurrentHashMap<>(512);
 
     private final ConcurrentMap<String, ConcurrentMap<Integer, Long>> resetOffsetTable =
         new ConcurrentHashMap<>(512);
@@ -402,6 +403,7 @@ public class ConsumerOffsetManager extends ConfigManager {
         ConcurrentMap<Integer, Long> map = resetOffsetTable.get(key);
         if (null == map) {
             map = new ConcurrentHashMap<Integer, Long>();
+            //利用putIfAbsent返回原来的数据，解决了线程安全问题
             ConcurrentMap<Integer, Long> previous = resetOffsetTable.putIfAbsent(key, map);
             if (null != previous) {
                 map = previous;
