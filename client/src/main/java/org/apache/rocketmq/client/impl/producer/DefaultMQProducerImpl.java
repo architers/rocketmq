@@ -582,7 +582,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                                          final long timeout, final long beginStartTime)
             throws MQClientException, InterruptedException {
         ExecutorService executor = this.getAsyncSenderExecutor();
-        //获取是否开启后台积压
+        //获取是否开启后异步发送限流
         boolean isEnableBackpressureForAsyncMode = this.getDefaultMQProducer().isEnableBackpressureForAsyncMode();
         //是否获取到异步发送数量信号量
         boolean isSemaphoreAsyncNumAquired = false;
