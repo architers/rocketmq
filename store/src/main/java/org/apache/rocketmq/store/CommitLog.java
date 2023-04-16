@@ -1093,20 +1093,28 @@ public class CommitLog implements Swappable {
         return true;
     }
 
+    /**
+     * 处理磁盘刷新和HA(HA就是高可用的意思)
+     */
     private CompletableFuture<PutMessageResult> handleDiskFlushAndHA(PutMessageResult putMessageResult,
         MessageExt messageExt, int needAckNums, boolean needHandleHA) {
+        //处理磁盘刷新
         CompletableFuture<PutMessageStatus> flushResultFuture = handleDiskFlush(putMessageResult.getAppendMessageResult(), messageExt);
         CompletableFuture<PutMessageStatus> replicaResultFuture;
+        //如果不需要处理HA,分片结果默认就为put_ok
         if (!needHandleHA) {
             replicaResultFuture = CompletableFuture.completedFuture(PutMessageStatus.PUT_OK);
         } else {
             replicaResultFuture = handleHA(putMessageResult.getAppendMessageResult(), putMessageResult, needAckNums);
         }
 
+        //TODO1这段代码thenCombine怎么解读
         return flushResultFuture.thenCombine(replicaResultFuture, (flushStatus, replicaStatus) -> {
+            //刷新磁盘
             if (flushStatus != PutMessageStatus.PUT_OK) {
                 putMessageResult.setPutMessageStatus(flushStatus);
             }
+            //处理高可用
             if (replicaStatus != PutMessageStatus.PUT_OK) {
                 putMessageResult.setPutMessageStatus(replicaStatus);
             }
@@ -1131,6 +1139,7 @@ public class CommitLog implements Swappable {
         // Wait enough acks from different slaves
         GroupCommitRequest request = new GroupCommitRequest(nextOffset, this.defaultMessageStore.getMessageStoreConfig().getSlaveTimeout(), needAckNums);
         haService.putRequest(request);
+        //唤醒全部的 Slave 同步
         haService.getWaitNotifyObject().wakeupAll();
         return request.future();
     }

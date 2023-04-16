@@ -17,7 +17,16 @@
 package org.apache.rocketmq.store.config;
 
 public enum BrokerRole {
+    /**
+     * 指客户端发送消息到Master，Master将消息同步复制到Slave
+     */
     ASYNC_MASTER,
+    /**
+     * 指客户端发送消息到Master，再由异步线程HAService异步同步到Slvae的过程
+     */
     SYNC_MASTER,
+    /**
+     * 从节点
+     */
     SLAVE;
 }
