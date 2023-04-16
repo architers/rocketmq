@@ -1362,7 +1362,7 @@ public class DefaultMessageStore implements MessageStore {
                 this.brokerStatsManager.onTopicDeleted(topic);
             }
 
-            // destroy consume queue dir
+            // destroy consume queue dir(删除topic对应consumeQueue的目录的数据)
             String consumeQueueDir = StorePathConfigHelper.getStorePathConsumeQueue(
                     this.messageStoreConfig.getStorePathRootDir()) + File.separator + topic;
             String consumeQueueExtDir = StorePathConfigHelper.getStorePathConsumeQueue(
