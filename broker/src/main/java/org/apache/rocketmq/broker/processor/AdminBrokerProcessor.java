@@ -495,6 +495,9 @@ public class AdminBrokerProcessor implements NettyRequestProcessor {
         return response;
     }
 
+    /**
+     * 删除topic
+     */
     private synchronized RemotingCommand deleteTopic(ChannelHandlerContext ctx,
         RemotingCommand request) throws RemotingCommandException {
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
@@ -514,6 +517,7 @@ public class AdminBrokerProcessor implements NettyRequestProcessor {
             response.setRemark(result.getRemark());
             return response;
         }
+        //默认情况，系统topic不能被删除
         if (brokerController.getBrokerConfig().isValidateSystemTopicWhenUpdateTopic()) {
             if (TopicValidator.isSystemTopic(topic)) {
                 response.setCode(ResponseCode.SYSTEM_ERROR);
@@ -521,11 +525,15 @@ public class AdminBrokerProcessor implements NettyRequestProcessor {
                 return response;
             }
         }
-
+        //删除topic配置
         this.brokerController.getTopicConfigManager().deleteTopicConfig(requestHeader.getTopic());
+        //删除topic的队列映射信息
         this.brokerController.getTopicQueueMappingManager().delete(requestHeader.getTopic());
+        //删除消费的offset信息
         this.brokerController.getConsumerOffsetManager().cleanOffsetByTopic(requestHeader.getTopic());
+        //TODO2
         this.brokerController.getPopInflightMessageCounter().clearInFlightMessageNumByTopicName(requestHeader.getTopic());
+        //删除topic的存储信息
         this.brokerController.getMessageStore().deleteTopics(Sets.newHashSet(requestHeader.getTopic()));
         response.setCode(ResponseCode.SUCCESS);
         response.setRemark(null);
