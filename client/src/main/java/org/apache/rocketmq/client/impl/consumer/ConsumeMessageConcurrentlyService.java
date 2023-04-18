@@ -314,6 +314,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                     }
                     boolean result = this.sendMessageBack(msg, context);
                     if (!result) {
+                        //失败次数加1
                         msg.setReconsumeTimes(msg.getReconsumeTimes() + 1);
                         msgBackFailed.add(msg);
                     }
