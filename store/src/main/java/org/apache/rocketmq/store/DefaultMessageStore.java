@@ -1737,6 +1737,9 @@ public class DefaultMessageStore implements MessageStore {
 
     private void addScheduleTask() {
 
+        /*
+         * 定期清理文件（默认每十秒指定一次）
+         */
         this.scheduledExecutorService.scheduleAtFixedRate(new AbstractBrokerRunnable(this.getBrokerIdentity()) {
             @Override
             public void run0() {
@@ -1791,8 +1794,11 @@ public class DefaultMessageStore implements MessageStore {
      * 定期清理文件
      */
     private void cleanFilesPeriodically() {
+        //清理broker文件
         this.cleanCommitLogService.run();
+        //清理consumeQueue文件（会跟commitLog的最小偏移量对比，如果commitLog的最小偏移量>consumeQueue文件的最大偏移量，就会删除）
         this.cleanConsumeQueueService.run();
+        //纠正consumeQueue的偏移量（consumeQueue文件删了一部分，最小偏移量就会有问题，需要纠正）
         this.correctLogicOffsetService.run();
     }
 
