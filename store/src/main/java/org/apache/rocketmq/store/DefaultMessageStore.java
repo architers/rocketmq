@@ -2065,6 +2065,9 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+    /**
+     * 将commitLog转发，构建consumeQueue
+     */
     class CommitLogDispatcherBuildConsumeQueue implements CommitLogDispatcher {
 
         @Override
@@ -2073,7 +2076,7 @@ public class DefaultMessageStore implements MessageStore {
             switch (tranType) {
                 case MessageSysFlag.TRANSACTION_NOT_TYPE:
                 case MessageSysFlag.TRANSACTION_COMMIT_TYPE:
-                    //同步给ConsumeQueue
+                    //不是事务类型或者是事务提交，就转发请求
                     DefaultMessageStore.this.putMessagePositionInfo(request);
                     break;
                 case MessageSysFlag.TRANSACTION_PREPARED_TYPE:
@@ -2083,6 +2086,10 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+
+    /**
+     * 将commitLog文件转发到index文件中
+     */
     class CommitLogDispatcherBuildIndex implements CommitLogDispatcher {
 
         @Override
@@ -2722,6 +2729,9 @@ public class DefaultMessageStore implements MessageStore {
 
     }
 
+    /**
+     * 重放消息service
+     */
     class ReputMessageService extends ServiceThread {
 
         protected volatile long reputFromOffset = 0;
