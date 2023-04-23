@@ -404,6 +404,7 @@ public class CommitLog implements Swappable {
 
             int flag = byteBuffer.getInt();
 
+            //队列的offset(consumeOffset)
             long queueOffset = byteBuffer.getLong();
 
             long physicOffset = byteBuffer.getLong();
