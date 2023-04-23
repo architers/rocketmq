@@ -213,14 +213,19 @@ public class DefaultMessageStore implements MessageStore {
         } else {
             this.commitLog = new CommitLog(this);
         }
-
+        //consumeQueue存储
         this.consumeQueueStore = new ConsumeQueueStore(this, this.messageStoreConfig);
 
         this.flushConsumeQueueService = new FlushConsumeQueueService();
+        //清理commitLog文件service
         this.cleanCommitLogService = new CleanCommitLogService();
+        //清理consumeQueue文件service
         this.cleanConsumeQueueService = new CleanConsumeQueueService();
+        //纠正consumeQueue的最小偏移量
         this.correctLogicOffsetService = new CorrectLogicOffsetService();
+        //存储统计的service
         this.storeStatsService = new StoreStatsService(getBrokerIdentity());
+        //index的service(我们在rocketmq控制台查询，就是先通过index文件获取commitLog的偏移量，然后从commitLog获取真正的消息)
         this.indexService = new IndexService(this);
 
         if (!messageStoreConfig.isEnableDLegerCommitLog() && !this.messageStoreConfig.isDuplicationEnable()) {
@@ -237,8 +242,10 @@ public class DefaultMessageStore implements MessageStore {
         }
 
         if (!messageStoreConfig.isEnableBuildConsumeQueueConcurrently()) {
+            //单线程构建consumeQueue
             this.reputMessageService = new ReputMessageService();
         } else {
+            //多线程构建consumeQueue
             this.reputMessageService = new ConcurrentReputMessageService();
         }
 
@@ -2789,6 +2796,7 @@ public class DefaultMessageStore implements MessageStore {
 
                 try {
                     this.reputFromOffset = result.getStartOffset();
+                    System.out.println(reputFromOffset);
 
                     for (int readSize = 0; readSize < result.getSize() && reputFromOffset < DefaultMessageStore.this.getConfirmOffset() && doNext; ) {
                         DispatchRequest dispatchRequest =
@@ -2802,8 +2810,9 @@ public class DefaultMessageStore implements MessageStore {
 
                         if (dispatchRequest.isSuccess()) {
                             if (size > 0) {
+                                //转发commitLog消息
                                 DefaultMessageStore.this.doDispatch(dispatchRequest);
-
+                                //如果开启长轮训而且消息到达监听器不为空，就通知消息到达
                                 if (DefaultMessageStore.this.brokerConfig.isLongPollingEnable()
                                         && DefaultMessageStore.this.messageArrivingListener != null) {
                                     DefaultMessageStore.this.messageArrivingListener.arriving(dispatchRequest.getTopic(),
@@ -2812,7 +2821,7 @@ public class DefaultMessageStore implements MessageStore {
                                             dispatchRequest.getBitMap(), dispatchRequest.getPropertiesMap());
                                     notifyMessageArrive4MultiQueue(dispatchRequest);
                                 }
-
+                                //重放偏移量增加
                                 this.reputFromOffset += size;
                                 readSize += size;
                                 if (!DefaultMessageStore.this.getMessageStoreConfig().isDuplicationEnable() &&
