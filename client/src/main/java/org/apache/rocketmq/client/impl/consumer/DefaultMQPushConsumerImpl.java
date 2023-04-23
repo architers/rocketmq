@@ -464,7 +464,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
 
         boolean commitOffsetEnable = false;
         long commitOffsetValue = 0L;
-        //集群模式下，从本地获取消费的offset,如果>0，就在pull请求中提交消费的offset
+        //集群模式下，从本地获取消费的consumerOffset,如果>0，就在pull请求中提交消费的offset
         if (MessageModel.CLUSTERING == this.defaultMQPushConsumer.getMessageModel()) {
             commitOffsetValue = this.offsetStore.readOffset(pullRequest.getMessageQueue(), ReadOffsetType.READ_FROM_MEMORY);
             if (commitOffsetValue > 0) {
@@ -1392,7 +1392,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
     }
 
     /**
-     * 持久化消费的offset
+     * 持久化当前消费者负载到的队列的consumeroffset
      */
     @Override
     public void persistConsumerOffset() {

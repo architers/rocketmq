@@ -204,6 +204,7 @@ public class ProcessQueue {
                     result = this.queueOffsetMax + 1;
                     int removedCnt = 0;
                     for (MessageExt msg : msgs) {
+                        //移除已经消费成功的消息
                         MessageExt prev = msgTreeMap.remove(msg.getQueueOffset());
                         if (prev != null) {
                             removedCnt--;
