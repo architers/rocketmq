@@ -116,25 +116,48 @@ public class DefaultMessageStore implements MessageStore {
     private static final Logger LOGGER = LoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
 
     public final PerfCounter.Ticks perfs = new PerfCounter.Ticks(LOGGER);
-
+    /**
+     * 消息存储配置
+     */
     private final MessageStoreConfig messageStoreConfig;
     // CommitLog
     private final CommitLog commitLog;
 
     private final ConsumeQueueStore consumeQueueStore;
 
+    /**
+     * ConsumeQueue刷盘
+     */
     private final FlushConsumeQueueService flushConsumeQueueService;
 
+    /**
+     * 清理commitLog
+     */
     private final CleanCommitLogService cleanCommitLogService;
 
+    /**
+     * 清理ConsumeQueue
+     */
     private final CleanConsumeQueueService cleanConsumeQueueService;
 
+    /**
+     * 纠正consumeQueue的偏移量
+     */
     private final CorrectLogicOffsetService correctLogicOffsetService;
 
+    /**
+     * 索引文件实现类
+     */
     private final IndexService indexService;
 
+    /**
+     * MappedFile分配服务
+     */
     private final AllocateMappedFileService allocateMappedFileService;
 
+    /**
+     * 重放消息，将commitLog分发到consumeQueue,indexFile就是这个类中
+     */
     private ReputMessageService reputMessageService;
 
     private HAService haService;
@@ -146,6 +169,9 @@ public class DefaultMessageStore implements MessageStore {
 
     private final StoreStatsService storeStatsService;
 
+    /**
+     * 消息堆内存缓存
+     */
     private final TransientStorePool transientStorePool;
 
     private final RunningFlags runningFlags = new RunningFlags();
@@ -153,14 +179,29 @@ public class DefaultMessageStore implements MessageStore {
 
     private final ScheduledExecutorService scheduledExecutorService;
     private final BrokerStatsManager brokerStatsManager;
+    /**
+     * 消息达到监听器
+     */
     private final MessageArrivingListener messageArrivingListener;
+    /**
+     * broker配置
+     */
     private final BrokerConfig brokerConfig;
 
     private volatile boolean shutdown = true;
 
+    /**
+     * 文件刷盘检查点
+     */
     private StoreCheckpoint storeCheckpoint;
+    /**
+     * 定时消息存储
+     */
     private TimerMessageStore timerMessageStore;
 
+    /**
+     * CommitLog文件转发
+     */
     private final LinkedList<CommitLogDispatcher> dispatcherList;
 
     private RandomAccessFile lockFile;
@@ -168,7 +209,7 @@ public class DefaultMessageStore implements MessageStore {
     private FileLock lock;
 
     boolean shutDownNormal = false;
-    // Max pull msg size
+    // Max pull msg size（最大拉取消息大小:128M)
     private final static int MAX_PULL_MSG_SIZE = 128 * 1024 * 1024;
 
     private volatile int aliveReplicasNum = 1;
@@ -182,9 +223,14 @@ public class DefaultMessageStore implements MessageStore {
     private volatile long masterFlushedOffset = -1L;
 
     private volatile long brokerInitMaxOffset = -1L;
-
+    /**
+     * putMessage钩子函数
+     */
     protected List<PutMessageHook> putMessageHookList = new ArrayList<>();
 
+    /**
+     * 发送消息返回钩子函数（消息重试到延迟队列）
+     */
     private SendMessageBackHook sendMessageBackHook;
 
     private final ConcurrentMap<Integer /* level */, Long/* delay timeMillis */> delayLevelTable =
@@ -208,6 +254,7 @@ public class DefaultMessageStore implements MessageStore {
         this.aliveReplicasNum = messageStoreConfig.getTotalReplicas();
         this.brokerStatsManager = brokerStatsManager;
         this.allocateMappedFileService = new AllocateMappedFileService(this);
+        //默认没有开启DLeger
         if (messageStoreConfig.isEnableDLegerCommitLog()) {
             this.commitLog = new DLedgerCommitLog(this);
         } else {
@@ -227,7 +274,7 @@ public class DefaultMessageStore implements MessageStore {
         this.storeStatsService = new StoreStatsService(getBrokerIdentity());
         //index的service(我们在rocketmq控制台查询，就是先通过index文件获取commitLog的偏移量，然后从commitLog获取真正的消息)
         this.indexService = new IndexService(this);
-
+        //TODO1
         if (!messageStoreConfig.isEnableDLegerCommitLog() && !this.messageStoreConfig.isDuplicationEnable()) {
             if (brokerConfig.isEnableControllerMode()) {
                 this.haService = new AutoSwitchHAService();
@@ -258,6 +305,7 @@ public class DefaultMessageStore implements MessageStore {
         this.dispatcherList.addLast(new CommitLogDispatcherBuildConsumeQueue());
         this.dispatcherList.addLast(new CommitLogDispatcherBuildIndex());
         if (messageStoreConfig.isEnableCompaction()) {
+            //TODO1
             this.compactionStore = new CompactionStore(this);
             this.compactionService = new CompactionService(commitLog, this, compactionStore);
             this.dispatcherList.addLast(new CommitLogDispatcherCompaction(compactionService));
@@ -268,10 +316,13 @@ public class DefaultMessageStore implements MessageStore {
         UtilAll.ensureDirOK(getStorePathPhysic());
         UtilAll.ensureDirOK(getStorePathLogic());
         lockFile = new RandomAccessFile(file, "rw");
-
+        //解析延迟级别
         parseDelayLevel();
     }
 
+    /**
+     * 解析延迟级别
+     */
     public boolean parseDelayLevel() {
         HashMap<String, Long> timeUnitTable = new HashMap<>();
         timeUnitTable.put("s", 1000L);
@@ -320,17 +371,19 @@ public class DefaultMessageStore implements MessageStore {
             LOGGER.info("last shutdown {}, store path root dir: {}",
                     lastExitOK ? "normally" : "abnormally", messageStoreConfig.getStorePathRootDir());
 
-            // load Commit Log
+            // load Commit Log(加载commitLog文件->支持多路径load）
             result = this.commitLog.load();
 
-            // load Consume Queue
+            // load Consume Queue(加载consumeQueue文件）
             result = result && this.consumeQueueStore.load();
 
             if (messageStoreConfig.isEnableCompaction()) {
+                //TODO1
                 result = result && this.compactionService.load(lastExitOK);
             }
 
             if (result) {
+                ////TODO1
                 this.storeCheckpoint =
                         new StoreCheckpoint(
                                 StorePathConfigHelper.getStoreCheckpoint(this.messageStoreConfig.getStorePathRootDir()));
@@ -379,7 +432,7 @@ public class DefaultMessageStore implements MessageStore {
 
         lockFile.getChannel().write(ByteBuffer.wrap("lock".getBytes(StandardCharsets.UTF_8)));
         lockFile.getChannel().force(true);
-
+        //设置reputMessageService的确认偏移量
         this.reputMessageService.setReputFromOffset(this.commitLog.getConfirmOffset());
         this.reputMessageService.start();
 
@@ -399,6 +452,7 @@ public class DefaultMessageStore implements MessageStore {
         }
 
         this.createTempFile();
+        //添加定时任务
         this.addScheduleTask();
         this.perfs.start();
         this.shutdown = false;
@@ -1731,7 +1785,7 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     /**
-     * @throws IOException
+     * 创造Abort临时文件
      */
     private void createTempFile() throws IOException {
         String fileName = StorePathConfigHelper.getAbortFile(this.messageStoreConfig.getStorePathRootDir());
@@ -1739,6 +1793,7 @@ public class DefaultMessageStore implements MessageStore {
         UtilAll.ensureDirOK(file.getParent());
         boolean result = file.createNewFile();
         LOGGER.info(fileName + (result ? " create OK" : " already exists"));
+        //将pid写入abort文件中
         MixAll.string2File(Long.toString(MixAll.getPID()), file.getAbsolutePath());
     }
 
@@ -1782,6 +1837,9 @@ public class DefaultMessageStore implements MessageStore {
             }
         }, 1, 1, TimeUnit.SECONDS);
 
+        /*
+         * 每秒刷新storeCheckpoint文件
+         */
         this.scheduledExecutorService.scheduleAtFixedRate(new AbstractBrokerRunnable(this.getBrokerIdentity()) {
             @Override
             public void run0() {
@@ -2603,7 +2661,7 @@ public class DefaultMessageStore implements MessageStore {
             }
 
             long logicsMsgTimestamp = 0;
-
+            //得到刷新consumeQueue间隔时间（默认60s)
             int flushConsumeQueueThoroughInterval = DefaultMessageStore.this.getMessageStoreConfig().getFlushConsumeQueueThoroughInterval();
             long currentTimeMillis = System.currentTimeMillis();
             if (currentTimeMillis >= (this.lastFlushTimestamp + flushConsumeQueueThoroughInterval)) {
@@ -2641,6 +2699,7 @@ public class DefaultMessageStore implements MessageStore {
 
             while (!this.isStopped()) {
                 try {
+                    //默认1s刷新一次consumeQueue
                     int interval = DefaultMessageStore.this.getMessageStoreConfig().getFlushIntervalConsumeQueue();
                     this.waitForRunning(interval);
                     this.doFlush(1);
@@ -2796,7 +2855,7 @@ public class DefaultMessageStore implements MessageStore {
 
                 try {
                     this.reputFromOffset = result.getStartOffset();
-                    System.out.println(reputFromOffset);
+                   
 
                     for (int readSize = 0; readSize < result.getSize() && reputFromOffset < DefaultMessageStore.this.getConfirmOffset() && doNext; ) {
                         DispatchRequest dispatchRequest =

@@ -33,7 +33,7 @@ import sun.nio.ch.DirectBuffer;
  * 但这部分内存并不是常驻内存，可以被置换到交换内存
  * (虚拟内存)，RocketMQ 为了提高消息发送的性能，引入了内存锁定机制，即将最近需要操作的 commitlog 文件映射到内存，并提供内存锁定功能，确保这些文件始终存在内存中，该机制的控制参数就是 transientStorePoolEnable
  * <li>如果开启，会分配直接内存（默认5个commitLog文件大小），让消息写入直接内存中</li>
- * 
+ *
  *
  */
 public class TransientStorePool {
