@@ -139,7 +139,7 @@ public class MessageStoreConfig {
     // Whether schedule flush
     @ImportantField
     private boolean flushCommitLogTimed = true;
-    // ConsumeQueue flush interval
+    // ConsumeQueue flush interval(刷新consumeQueue间隔时间）
     private int flushIntervalConsumeQueue = 1000;
     // Resource reclaim interval
     private int cleanResourceInterval = 10000;
@@ -232,6 +232,9 @@ public class MessageStoreConfig {
     private long osPageCacheBusyTimeOutMills = 1000;
     private int defaultQueryMaxNum = 32;
 
+    /**
+     * 消息堆内存缓存
+     */
     @ImportantField
     private boolean transientStorePoolEnable = false;
     private int transientStorePoolSize = 5;

@@ -57,6 +57,7 @@ import org.apache.rocketmq.store.logfile.MappedFile;
 
 /**
  * Store all metadata downtime for recovery, data protection reliability
+ * DLedger模式下的commitLog文件
  */
 public class DLedgerCommitLog extends CommitLog {
 
