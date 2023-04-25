@@ -770,6 +770,7 @@ public class CommitLog implements Swappable {
         boolean autoMessageVersionOnTopicLen =
             this.defaultMessageStore.getMessageStoreConfig().isAutoMessageVersionOnTopicLen();
         if (autoMessageVersionOnTopicLen && topic.length() > Byte.MAX_VALUE) {
+            //topic长度超过127(本来topic没有127，但是拼接上重试前缀就超过127)就用message_version_v2
             msg.setVersion(MessageVersion.MESSAGE_VERSION_V2);
         }
 
@@ -782,9 +783,10 @@ public class CommitLog implements Swappable {
         if (storeSocketAddress.getAddress() instanceof Inet6Address) {
             msg.setStoreHostAddressV6Flag();
         }
-
+        //更新当前线程的最大消息大小
         PutMessageThreadLocal putMessageThreadLocal = this.putMessageThreadLocal.get();
         updateMaxMessageSize(putMessageThreadLocal);
+
         String topicQueueKey = generateKey(putMessageThreadLocal.getKeyBuilder(), msg);
         long elapsedTimeInLock = 0;
         MappedFile unlockMappedFile = null;
@@ -817,16 +819,18 @@ public class CommitLog implements Swappable {
                 return CompletableFuture.completedFuture(new PutMessageResult(PutMessageStatus.IN_SYNC_REPLICAS_NOT_ENOUGH, null));
             }
         }
-
+        //锁住topic当前的queue
         topicQueueLock.lock(topicQueueKey);
         try {
 
             boolean needAssignOffset = true;
             if (defaultMessageStore.getMessageStoreConfig().isDuplicationEnable()
                 && defaultMessageStore.getMessageStoreConfig().getBrokerRole() != BrokerRole.SLAVE) {
+                //TODO1 为什么复制启用&主节点，就不用分配offset
                 needAssignOffset = false;
             }
             if (needAssignOffset) {
+                //分配消息的偏移量（根据topic和queueId判断）
                 defaultMessageStore.assignOffset(msg, getMessageNum(msg));
             }
 

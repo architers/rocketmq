@@ -170,7 +170,7 @@ public class DefaultMessageStore implements MessageStore {
     private final StoreStatsService storeStatsService;
 
     /**
-     * 消息堆内存缓存
+     * 直接内存存储池
      */
     private final TransientStorePool transientStorePool;
 
@@ -413,18 +413,20 @@ public class DefaultMessageStore implements MessageStore {
      */
     @Override
     public void start() throws Exception {
+
         if (!messageStoreConfig.isEnableDLegerCommitLog() && !this.messageStoreConfig.isDuplicationEnable()) {
             this.haService.init(this);
         }
-
+        //初始化直接内存存储池
         if (this.isTransientStorePoolEnable()) {
             this.transientStorePool.init();
         }
-
+        //
         this.allocateMappedFileService.start();
-
+        //启动索引文件service
         this.indexService.start();
 
+        //尝试锁定lock文件，如果失败，说明服务已经启动
         lock = lockFile.getChannel().tryLock(0, 1, false);
         if (lock == null || lock.isShared() || !lock.isValid()) {
             throw new RuntimeException("Lock failed,MQ already started");
@@ -432,12 +434,13 @@ public class DefaultMessageStore implements MessageStore {
 
         lockFile.getChannel().write(ByteBuffer.wrap("lock".getBytes(StandardCharsets.UTF_8)));
         lockFile.getChannel().force(true);
-        //设置reputMessageService的确认偏移量
+        //设置reputMessageService的确认偏移量，并启动
         this.reputMessageService.setReputFromOffset(this.commitLog.getConfirmOffset());
         this.reputMessageService.start();
 
         // Checking is not necessary, as long as the dLedger's implementation exactly follows the definition of Recover,
         // which is eliminating the dispatch inconsistency between the commitLog and consumeQueue at the end of recovery.
+        //重新检查consumeQueue的reput偏移量
         this.doRecheckReputOffsetFromCq();
 
         this.flushConsumeQueueService.start();
@@ -458,6 +461,9 @@ public class DefaultMessageStore implements MessageStore {
         this.shutdown = false;
     }
 
+    /**
+     * 重新检查consumeQueue的reput偏移量
+     */
     private void doRecheckReputOffsetFromCq() throws InterruptedException {
         if (!messageStoreConfig.isRecheckReputOffsetFromCq()) {
             return;
@@ -570,6 +576,9 @@ public class DefaultMessageStore implements MessageStore {
         this.deleteFile(StorePathConfigHelper.getStoreCheckpoint(this.messageStoreConfig.getStorePathRootDir()));
     }
 
+    /**
+     * 得到主要文件大小
+     */
     public long getMajorFileSize() {
         long commitLogSize = 0;
         if (this.commitLog != null) {
@@ -589,6 +598,7 @@ public class DefaultMessageStore implements MessageStore {
         return commitLogSize + consumeQueueSize + indexFileSize;
     }
 
+
     @Override
     public void destroyLogics() {
         this.consumeQueueStore.destroy();
@@ -604,13 +614,14 @@ public class DefaultMessageStore implements MessageStore {
                 return CompletableFuture.completedFuture(handleResult);
             }
         }
-        //TODO
+        //批量消息属性校验
         if (msg.getProperties().containsKey(MessageConst.PROPERTY_INNER_NUM)
                 && !MessageSysFlag.check(msg.getSysFlag(), MessageSysFlag.INNER_BATCH_FLAG)) {
             LOGGER.warn("[BUG]The message had property {} but is not an inner batch", MessageConst.PROPERTY_INNER_NUM);
             return CompletableFuture.completedFuture(new PutMessageResult(PutMessageStatus.MESSAGE_ILLEGAL, null));
         }
 
+        //发送的批量消息，判断topic属性是不是批量consumeQueue
         if (MessageSysFlag.check(msg.getSysFlag(), MessageSysFlag.INNER_BATCH_FLAG)) {
             Optional<TopicConfig> topicConfig = this.getTopicConfig(msg.getTopic());
             if (!QueueTypeUtils.isBatchCq(topicConfig)) {
@@ -1785,7 +1796,7 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     /**
-     * 创造Abort临时文件
+     * 创造abort临时文件
      */
     private void createTempFile() throws IOException {
         String fileName = StorePathConfigHelper.getAbortFile(this.messageStoreConfig.getStorePathRootDir());
