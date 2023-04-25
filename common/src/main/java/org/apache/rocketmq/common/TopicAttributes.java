@@ -31,12 +31,18 @@ public class TopicAttributes {
         newHashSet("BatchCQ", "SimpleCQ"),
         "SimpleCQ"
     );
+    /**
+     * 清理策略（默认删除）-支持删除|压缩
+     */
     public static final EnumAttribute CLEANUP_POLICY_ATTRIBUTE = new EnumAttribute(
         "cleanup.policy",
         false,
         newHashSet("DELETE", "COMPACTION"),
         "DELETE"
     );
+    /**
+     * 消息类型：默认普通消息
+     */
     public static final EnumAttribute TOPIC_MESSAGE_TYPE_ATTRIBUTE = new EnumAttribute(
         "message.type",
         true,
