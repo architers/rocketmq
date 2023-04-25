@@ -259,7 +259,7 @@ public class DefaultMappedFile extends AbstractMappedFile {
         PutMessageContext putMessageContext) {
         assert messageExt != null;
         assert cb != null;
-
+        //当前写位置
         int currentPos = WROTE_POSITION_UPDATER.get(this);
 
         if (currentPos < this.fileSize) {

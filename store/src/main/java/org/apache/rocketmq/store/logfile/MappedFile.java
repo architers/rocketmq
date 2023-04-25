@@ -134,7 +134,7 @@ public interface MappedFile {
     long getFileFromOffset();
 
     /**
-     * Flushes the data in cache to disk immediately.
+     * Flushes the data in cache to disk immediately（立即将缓存中的数据刷新到磁盘）.
      *
      * @param flushLeastPages the least pages to flush
      * @return the flushed position after the method call

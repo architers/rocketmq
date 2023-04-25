@@ -836,11 +836,12 @@ public class CommitLog implements Swappable {
 
             PutMessageResult encodeResult = putMessageThreadLocal.getEncoder().encode(msg);
             if (encodeResult != null) {
+                //说明校验不通过
                 return CompletableFuture.completedFuture(encodeResult);
             }
             msg.setEncodedBuff(putMessageThreadLocal.getEncoder().getEncoderBuffer());
             PutMessageContext putMessageContext = new PutMessageContext(topicQueueKey);
-
+            //同一时刻只能一个线程putMessage
             putMessageLock.lock(); //spin or ReentrantLock ,depending on store config
             try {
                 long beginLockTimestamp = this.defaultMessageStore.getSystemClock().now();
@@ -851,7 +852,7 @@ public class CommitLog implements Swappable {
                 if (!defaultMessageStore.getMessageStoreConfig().isDuplicationEnable()) {
                     msg.setStoreTimestamp(beginLockTimestamp);
                 }
-
+                //防止mappedFile满了，或者是首次（首次就自动创建）
                 if (null == mappedFile || mappedFile.isFull()) {
                     mappedFile = this.mappedFileQueue.getLastMappedFile(0); // Mark: NewFile may be cause noise
                 }
@@ -1320,6 +1321,9 @@ public class CommitLog implements Swappable {
         }
     }
 
+    /**
+     * 真正commitLog异步刷盘的service
+     */
     class FlushRealTimeService extends FlushCommitLogService {
         private long lastFlushTimestamp = 0;
         private long printTimes = 0;
@@ -1329,11 +1333,13 @@ public class CommitLog implements Swappable {
             CommitLog.log.info(this.getServiceName() + " service started");
 
             while (!this.isStopped()) {
+                //刷新提交日志定时(默认true)
                 boolean flushCommitLogTimed = CommitLog.this.defaultMessageStore.getMessageStoreConfig().isFlushCommitLogTimed();
-
+                //刷新commitLog间隔时间(默认500ms)
                 int interval = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushIntervalCommitLog();
+                //刷新提交日志时要刷新多少页(默认4）
                 int flushPhysicQueueLeastPages = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushCommitLogLeastPages();
-
+                //刷新提交日志间隔时间(10s)
                 int flushPhysicQueueThoroughInterval =
                     CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushCommitLogThoroughInterval();
 
@@ -1362,6 +1368,7 @@ public class CommitLog implements Swappable {
                     CommitLog.this.mappedFileQueue.flush(flushPhysicQueueLeastPages);
                     long storeTimestamp = CommitLog.this.mappedFileQueue.getStoreTimestamp();
                     if (storeTimestamp > 0) {
+                        //设置Checkpoint的PhysicMsgTimestamp
                         CommitLog.this.defaultMessageStore.getStoreCheckpoint().setPhysicMsgTimestamp(storeTimestamp);
                     }
                     long past = System.currentTimeMillis() - begin;
@@ -1506,6 +1513,7 @@ public class CommitLog implements Swappable {
 
             while (!this.isStopped()) {
                 try {
+                    //同步刷盘也是10ms刷新一次
                     this.waitForRunning(10);
                     this.doCommit();
                 } catch (Exception e) {
