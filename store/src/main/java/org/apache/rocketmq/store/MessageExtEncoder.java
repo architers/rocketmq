@@ -111,46 +111,46 @@ public class MessageExtEncoder {
             return new PutMessageResult(PutMessageStatus.MESSAGE_ILLEGAL, null);
         }
 
-        // 1 TOTALSIZE
+        // 1 TOTALSIZE（总的大小）
         this.byteBuf.writeInt(msgLen);
-        // 2 MAGICCODE
+        // 2 MAGICCODE(判断是V1还是V2)
         this.byteBuf.writeInt(msgInner.getVersion().getMagicCode());
-        // 3 BODYCRC
+        // 3 BODYCRC(body)
         this.byteBuf.writeInt(msgInner.getBodyCRC());
-        // 4 QUEUEID
+        // 4 QUEUEID(队列ID)
         this.byteBuf.writeInt(msgInner.getQueueId());
-        // 5 FLAG
+        // 5 FLAG (标识）
         this.byteBuf.writeInt(msgInner.getFlag());
-        // 6 QUEUEOFFSET
+        // 6 QUEUEOFFSET（队列偏移量）
         this.byteBuf.writeLong(queueOffset);
         // 7 PHYSICALOFFSET, need update later
         this.byteBuf.writeLong(0);
         // 8 SYSFLAG
         this.byteBuf.writeInt(msgInner.getSysFlag());
-        // 9 BORNTIMESTAMP
+        // 9 BORNTIMESTAMP（消息诞生时间）
         this.byteBuf.writeLong(msgInner.getBornTimestamp());
 
-        // 10 BORNHOST
+        // 10 BORNHOST（诞生的主机）
         ByteBuffer bornHostBytes = msgInner.getBornHostBytes();
         this.byteBuf.writeBytes(bornHostBytes.array());
 
-        // 11 STORETIMESTAMP
+        // 11 STORETIMESTAMP（存储时间）
         this.byteBuf.writeLong(msgInner.getStoreTimestamp());
 
-        // 12 STOREHOSTADDRESS
+        // 12 STOREHOSTADDRESS （存储的host）
         ByteBuffer storeHostBytes = msgInner.getStoreHostBytes();
         this.byteBuf.writeBytes(storeHostBytes.array());
 
-        // 13 RECONSUMETIMES
+        // 13 RECONSUMETIMES (消费次数)
         this.byteBuf.writeInt(msgInner.getReconsumeTimes());
-        // 14 Prepared Transaction Offset
+        // 14 Prepared Transaction Offset（预事务偏移量）
         this.byteBuf.writeLong(msgInner.getPreparedTransactionOffset());
-        // 15 BODY
+        // 15 BODY (body长度）
         this.byteBuf.writeInt(bodyLength);
         if (bodyLength > 0)
             this.byteBuf.writeBytes(msgInner.getBody());
 
-        // 16 TOPIC
+        // 16 TOPIC（主体）
         if (MessageVersion.MESSAGE_VERSION_V2.equals(msgInner.getVersion())) {
             this.byteBuf.writeShort((short) topicLength);
         } else {
@@ -158,7 +158,7 @@ public class MessageExtEncoder {
         }
         this.byteBuf.writeBytes(topicData);
 
-        // 17 PROPERTIES
+        // 17 PROPERTIES（属性）
         this.byteBuf.writeShort((short) propertiesLength);
         if (propertiesLength > 0)
             this.byteBuf.writeBytes(propertiesData);
