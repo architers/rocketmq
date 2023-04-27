@@ -1266,6 +1266,9 @@ public class CommitLog implements Swappable {
         protected static final int RETRY_TIMES_OVER = 10;
     }
 
+    /**
+     * 真正提交commitLog的service
+     */
     class CommitRealTimeService extends FlushCommitLogService {
 
         private long lastCommitTimestamp = 0;
@@ -1282,16 +1285,18 @@ public class CommitLog implements Swappable {
         public void run() {
             CommitLog.log.info(this.getServiceName() + " service started");
             while (!this.isStopped()) {
+                //提交commitLog间隔时间
                 int interval = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getCommitIntervalCommitLog();
-
+                //至少提交多少页数据
                 int commitDataLeastPages = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getCommitCommitLogLeastPages();
-
+                //彻底提交commitLog间隔时间
                 int commitDataThoroughInterval =
                     CommitLog.this.defaultMessageStore.getMessageStoreConfig().getCommitCommitLogThoroughInterval();
 
                 long begin = System.currentTimeMillis();
                 if (begin >= (this.lastCommitTimestamp + commitDataThoroughInterval)) {
                     this.lastCommitTimestamp = begin;
+                    //每过commitDataThoroughInterval，就彻底提交一次
                     commitDataLeastPages = 0;
                 }
 
@@ -1300,6 +1305,7 @@ public class CommitLog implements Swappable {
                     long end = System.currentTimeMillis();
                     if (!result) {
                         this.lastCommitTimestamp = end; // result = false means some data committed.
+                        //false 说明一些数据已经提交，就唤醒刷盘
                         CommitLog.this.flushManager.wakeUpFlush();
                     }
                     CommitLog.this.getMessageStore().getPerfCounter().flowOnce("COMMIT_DATA_TIME_MS", (int) (end - begin));
@@ -1339,7 +1345,7 @@ public class CommitLog implements Swappable {
                 int interval = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushIntervalCommitLog();
                 //刷新提交日志时要刷新多少页(默认4）
                 int flushPhysicQueueLeastPages = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushCommitLogLeastPages();
-                //刷新提交日志间隔时间(10s)
+                //彻底提交日志间隔时间(10s)
                 int flushPhysicQueueThoroughInterval =
                     CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushCommitLogThoroughInterval();
 
@@ -1355,8 +1361,10 @@ public class CommitLog implements Swappable {
 
                 try {
                     if (flushCommitLogTimed) {
+                        //定时刷新
                         Thread.sleep(interval);
                     } else {
+                        //延迟等待，但是可以被提前唤醒
                         this.waitForRunning(interval);
                     }
 
@@ -1844,6 +1852,9 @@ public class CommitLog implements Swappable {
 
     }
 
+    /**
+     * 默认的刷盘管理
+     */
 
     class DefaultFlushManager implements FlushManager {
 
@@ -1876,6 +1887,7 @@ public class CommitLog implements Swappable {
             if (FlushDiskType.SYNC_FLUSH == CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushDiskType()) {
                 final GroupCommitService service = (GroupCommitService) this.flushCommitLogService;
                 if (messageExt.isWaitStoreMsgOK()) {
+                    //同步刷盘，等待刷盘消息存储ok
                     GroupCommitRequest request = new GroupCommitRequest(result.getWroteOffset() + result.getWroteBytes(), CommitLog.this.defaultMessageStore.getMessageStoreConfig().getSyncFlushTimeout());
                     service.putRequest(request);
                     CompletableFuture<PutMessageStatus> flushOkFuture = request.future();
@@ -1890,10 +1902,11 @@ public class CommitLog implements Swappable {
                         putMessageResult.setPutMessageStatus(PutMessageStatus.FLUSH_DISK_TIMEOUT);
                     }
                 } else {
+                    //唤醒刷盘线程
                     service.wakeup();
                 }
             }
-            // Asynchronous flush
+            // Asynchronous flush（异步刷盘）
             else {
                 if (!CommitLog.this.defaultMessageStore.isTransientStorePoolEnable()) {
                     flushCommitLogService.wakeup();

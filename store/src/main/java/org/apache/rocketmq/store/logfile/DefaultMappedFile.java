@@ -440,17 +440,19 @@ public class DefaultMappedFile extends AbstractMappedFile {
     }
 
     protected boolean isAbleToCommit(final int commitLeastPages) {
+        //提交的位置
         int commit = COMMITTED_POSITION_UPDATER.get(this);
+        //写的位置
         int write = WROTE_POSITION_UPDATER.get(this);
-
+        //满了就写
         if (this.isFull()) {
             return true;
         }
-
+        //到了指定的页数才commit
         if (commitLeastPages > 0) {
             return ((write / OS_PAGE_SIZE) - (commit / OS_PAGE_SIZE)) >= commitLeastPages;
         }
-
+        //有文件就写
         return write > commit;
     }
 
