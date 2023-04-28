@@ -651,6 +651,9 @@ public class DefaultMessageStore implements MessageStore {
         return putResultFuture;
     }
 
+    /**
+     * 异步put批量消息
+     */
     @Override
     public CompletableFuture<PutMessageResult> asyncPutMessages(MessageExtBatch messageExtBatch) {
 
@@ -691,6 +694,7 @@ public class DefaultMessageStore implements MessageStore {
 
     private PutMessageResult waitForPutResult(CompletableFuture<PutMessageResult> putMessageResultFuture) {
         try {
+            //最大put消息延迟时间（取同步刷盘延迟时间和同步给从的最大时间，然后加上5s）
             int putMessageTimeout =
                     Math.max(this.messageStoreConfig.getSyncFlushTimeout(),
                             this.messageStoreConfig.getSlaveTimeout()) + 5000;
