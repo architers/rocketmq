@@ -1865,11 +1865,13 @@ public class CommitLog implements Swappable {
 
         public DefaultFlushManager() {
             if (FlushDiskType.SYNC_FLUSH == CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushDiskType()) {
+                //同步刷盘
                 this.flushCommitLogService = new CommitLog.GroupCommitService();
             } else {
+                //异步刷盘
                 this.flushCommitLogService = new CommitLog.FlushRealTimeService();
             }
-
+            //异步+缓冲刷盘
             this.commitRealTimeService = new CommitLog.CommitRealTimeService();
         }
 

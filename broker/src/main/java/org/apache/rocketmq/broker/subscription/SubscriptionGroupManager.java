@@ -42,7 +42,7 @@ public class SubscriptionGroupManager extends ConfigManager {
     /**
      * 订阅组信息：key为消费组
      */
-    private ConcurrentMap<String, SubscriptionGroupConfig> subscriptionGroupTable =
+    private ConcurrentMap<String/*消费组*/, SubscriptionGroupConfig> subscriptionGroupTable =
         new ConcurrentHashMap<>(1024);
 
     /**

@@ -29,6 +29,9 @@ public class CleanupPolicyUtils {
         return Objects.equals(CleanupPolicy.COMPACTION, getDeletePolicy(topicConfig));
     }
 
+    /**
+     * 获取清理策略（默认删除）
+     */
     public static CleanupPolicy getDeletePolicy(Optional<TopicConfig> topicConfig) {
         if (!topicConfig.isPresent()) {
             return CleanupPolicy.valueOf(TopicAttributes.CLEANUP_POLICY_ATTRIBUTE.getDefaultValue());

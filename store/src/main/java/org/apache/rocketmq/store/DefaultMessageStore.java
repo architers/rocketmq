@@ -807,7 +807,7 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     /**
-     * 获取消息TODO1 看详情
+     * 获取消息
      */
     @Override
     public GetMessageResult getMessage(final String group, final String topic, final int queueId, final long offset,
@@ -836,7 +836,7 @@ public class DefaultMessageStore implements MessageStore {
 
         Optional<TopicConfig> topicConfig = getTopicConfig(topic);
         CleanupPolicy policy = CleanupPolicyUtils.getDeletePolicy(topicConfig);
-        //check request topic flag
+        //check request topic flag（压缩）
         if (Objects.equals(policy, CleanupPolicy.COMPACTION) && messageStoreConfig.isEnableCompaction()) {
             return compactionStore.getMessage(group, topic, queueId, offset, maxMsgNums, maxTotalMsgSize);
         } // else skip
@@ -858,21 +858,25 @@ public class DefaultMessageStore implements MessageStore {
             maxOffset = consumeQueue.getMaxOffsetInQueue();
 
             if (maxOffset == 0) {
+                //没有消息
                 status = GetMessageStatus.NO_MESSAGE_IN_QUEUE;
                 nextBeginOffset = nextOffsetCorrection(offset, 0);
             } else if (offset < minOffset) {
+                //获取的offset小于最小偏移量（说明之前的consumeQueue已经被清理）
                 status = GetMessageStatus.OFFSET_TOO_SMALL;
                 nextBeginOffset = nextOffsetCorrection(offset, minOffset);
             } else if (offset == maxOffset) {
+                //溢出一个偏移量
                 status = GetMessageStatus.OFFSET_OVERFLOW_ONE;
                 nextBeginOffset = nextOffsetCorrection(offset, offset);
             } else if (offset > maxOffset) {
+                //溢出太多偏移量，下次从maxOffset拉取
                 status = GetMessageStatus.OFFSET_OVERFLOW_BADLY;
                 nextBeginOffset = nextOffsetCorrection(offset, maxOffset);
             } else {
                 final int maxFilterMessageSize = Math.max(16000, maxMsgNums * consumeQueue.getUnitSize());
                 final boolean diskFallRecorded = this.messageStoreConfig.isDiskFallRecorded();
-
+                //最大拉取消息大小（默认128M)
                 long maxPullSize = Math.max(maxTotalMsgSize, 100);
                 if (maxPullSize > MAX_PULL_MSG_SIZE) {
                     LOGGER.warn("The max pull size is too large maxPullSize={} topic={} queueId={}", maxPullSize, topic, queueId);
@@ -881,13 +885,16 @@ public class DefaultMessageStore implements MessageStore {
                 status = GetMessageStatus.NO_MATCHED_MESSAGE;
                 long maxPhyOffsetPulling = 0;
                 int cqFileNum = 0;
-
+                //当缓冲区总大小<0&nextBeginOffset消息consumeQueue最大偏移量&consume文件数量<获取消息时编译consumeFile（默认为1）
+                // 的数量，就执行循环
                 while (getResult.getBufferTotalSize() <= 0
                         && nextBeginOffset < maxOffset
                         && cqFileNum++ < this.messageStoreConfig.getTravelCqFileNumWhenGetMessage()) {
+                    // 获取nextBeginOffset所在的consumeQueue文件缓冲区
                     ReferredIterator<CqUnit> bufferConsumeQueue = consumeQueue.iterateFrom(nextBeginOffset);
 
                     if (bufferConsumeQueue == null) {
+                        //没有匹配到consumeQueue文件
                         status = GetMessageStatus.OFFSET_FOUND_NULL;
                         nextBeginOffset = nextOffsetCorrection(nextBeginOffset, this.consumeQueueStore.rollNextFile(consumeQueue, nextBeginOffset));
                         LOGGER.warn("consumer request topic: " + topic + "offset: " + offset + " minOffset: " + minOffset + " maxOffset: "
@@ -1733,6 +1740,9 @@ public class DefaultMessageStore implements MessageStore {
         return this.consumeQueueStore.findOrCreateConsumeQueue(topic, queueId);
     }
 
+    /**
+     * 下一个偏移量纠正
+     */
     private long nextOffsetCorrection(long oldOffset, long newOffset) {
         long nextOffset = oldOffset;
         if (this.getMessageStoreConfig().getBrokerRole() != BrokerRole.SLAVE ||

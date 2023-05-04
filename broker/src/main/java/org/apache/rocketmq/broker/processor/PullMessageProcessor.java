@@ -341,6 +341,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
         }
 
         final boolean hasCommitOffsetFlag = PullSysFlag.hasCommitOffsetFlag(requestHeader.getSysFlag());
+        //如果有SubscriptionFlag，就每次从请求头中获取subscriptionData，否则从缓存中获取（默认false)
         final boolean hasSubscriptionFlag = PullSysFlag.hasSubscriptionFlag(requestHeader.getSysFlag());
 
         //查询topic配置，并判断topic是否能够读
@@ -351,7 +352,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
             response.setRemark(String.format("topic[%s] not exist, apply first please! %s", requestHeader.getTopic(), FAQUrl.suggestTodo(FAQUrl.APPLY_TOPIC_URL)));
             return response;
         }
-
+        //判断是否有读的权限
         if (!PermName.isReadable(topicConfig.getPerm())) {
             response.setCode(ResponseCode.NO_PERMISSION);
             responseHeader.setForbiddenType(ForbiddenType.TOPIC_FORBIDDEN);
@@ -438,7 +439,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
                 return response;
             }
 
-            //判断该topic的订阅组时候被禁用（TODO3:怎么显示消费组下某个topic）
+            //判断订阅组topic是否被禁用
             boolean readForbidden = this.brokerController.getSubscriptionGroupManager().getForbidden(
                 subscriptionGroupConfig.getGroupName(), requestHeader.getTopic(), PermName.INDEX_PERM_READ);
             if (readForbidden) {
@@ -455,7 +456,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
                 response.setRemark("the consumer's subscription not exist" + FAQUrl.suggestTodo(FAQUrl.SAME_GROUP_DIFFERENT_TOPIC));
                 return response;
             }
-            //如果服务端的版本比消费端小，抛出异常
+            //如果服务端的版本比消费端小，抛出异常(说明broker端不是最新的subscriptionData）
             if (subscriptionData.getSubVersion() < requestHeader.getSubVersion()) {
                 LOGGER.warn("The broker's subscription is not latest, group: {} {}", requestHeader.getConsumerGroup(),
                     subscriptionData.getSubString());
