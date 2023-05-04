@@ -267,6 +267,7 @@ public class DefaultPullMessageResultHandler implements PullMessageResultHandler
         }
 
         this.brokerController.getBrokerStatsManager().recordDiskFallBehindTime(group, topic, queueId, this.brokerController.getMessageStore().now() - storeTimestamp);
+        //TODO
         return byteBuffer.array();
     }
 

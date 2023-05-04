@@ -93,7 +93,7 @@ public class CommitLog implements Swappable {
                 messageStore.getMessageStoreConfig().getMappedFileSizeCommitLog(),
                 messageStore.getAllocateMappedFileService(), this::getFullStorePaths);
         } else {
-            //只配置了一个commitLog
+            //只配置了一个commitLog路径
             this.mappedFileQueue = new MappedFileQueue(storePath,
                 messageStore.getMessageStoreConfig().getMappedFileSizeCommitLog(),
                 messageStore.getAllocateMappedFileService());
