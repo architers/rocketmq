@@ -977,7 +977,8 @@ public class DefaultMessageStore implements MessageStore {
                     long fallBehind = maxOffsetPy - maxPhyOffsetPulling;
                     brokerStatsManager.recordDiskFallBehindSize(group, topic, queueId, fallBehind);
                 }
-
+                //如果最大的commitLog偏移量-拉取的最大偏移量）> 获取内存中的访问消息最大比率，就建议从slave节点拉取消息
+                //否则就从master拉取消息
                 long diff = maxOffsetPy - maxPhyOffsetPulling;
                 long memory = (long) (StoreUtil.TOTAL_PHYSICAL_MEMORY_SIZE
                         * (this.messageStoreConfig.getAccessMessageInMemoryMaxRatio() / 100.0));

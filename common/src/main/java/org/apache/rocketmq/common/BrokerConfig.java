@@ -142,6 +142,9 @@ public class BrokerConfig extends BrokerIdentity {
 
     private int sendHeartbeatTimeoutMillis = 1000;
 
+    /**
+     * 是否开启从clave节点拉取数据
+     */
     private boolean slaveReadEnable = false;
 
     private boolean disableConsumeIfConsumerReadSlowly = false;

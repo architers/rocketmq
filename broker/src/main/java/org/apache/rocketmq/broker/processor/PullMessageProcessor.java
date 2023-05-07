@@ -639,7 +639,10 @@ public class PullMessageProcessor implements NettyRequestProcessor {
                 assert false;
                 break;
         }
-
+        /*
+         *如果开启从节点读取而且没有不是BrokerContainer:如果主节点消费过慢，就从slave拉取
+         * 其他的情况就从master拉取消息
+         */
         if (this.brokerController.getBrokerConfig().isSlaveReadEnable() && !this.brokerController.getBrokerConfig().isInBrokerContainer()) {
             // consume too slow ,redirect to another machine
             if (getMessageResult.isSuggestPullingFromSlave()) {

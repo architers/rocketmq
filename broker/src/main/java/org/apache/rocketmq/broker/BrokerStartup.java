@@ -130,7 +130,7 @@ public class BrokerStartup {
             System.exit(-2);
         }
 
-        // Validate namesrvAddr（校验namesrv地址配置）
+        // Validate namesrvAddr（校验namesrv地址配置,多个用;分隔）
         String namesrvAddr = brokerConfig.getNamesrvAddr();
         if (StringUtils.isNotBlank(namesrvAddr)) {
             try {
@@ -145,15 +145,16 @@ public class BrokerStartup {
             }
         }
 
-        //访问消息在内存中比率,主节点默认为40，从节点30（TODO,有什么作用)
+        //访问消息在内存中比率,主节点默认为40，从节点30
         if (BrokerRole.SLAVE == messageStoreConfig.getBrokerRole()) {
             int ratio = messageStoreConfig.getAccessMessageInMemoryMaxRatio() - 10;
             messageStoreConfig.setAccessMessageInMemoryMaxRatio(ratio);
         }
 
         // Set broker role according to ha config
+        //如果没有开启主动自动切换controller模式，就设置主节点brokerId为0，并校验从节点>0
         if (!brokerConfig.isEnableControllerMode()) {
-            //主节点brokerId为0，从节点>0
+
             switch (messageStoreConfig.getBrokerRole()) {
                 case ASYNC_MASTER:
                 case SYNC_MASTER:
