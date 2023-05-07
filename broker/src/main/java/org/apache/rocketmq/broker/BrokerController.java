@@ -299,7 +299,7 @@ public class BrokerController {
         this.messageStoreConfig = messageStoreConfig;
         //构建broker存储host
         this.setStoreHost(new InetSocketAddress(this.getBrokerConfig().getBrokerIP1(), getListenPort()));
-        //TODO1 brokerStatsManager作用
+        // brokerStatsManager,用于统计broker各种数据（比如发送多少、拉取多少等）---Lmq就是轻量级消息队列的意思
         this.brokerStatsManager = messageStoreConfig.isEnableLmq() ? new LmqBrokerStatsManager(this.brokerConfig.getBrokerClusterName(), this.brokerConfig.isEnableDetailStat()) : new BrokerStatsManager(this.brokerConfig.getBrokerClusterName(), this.brokerConfig.isEnableDetailStat());
         //消费者偏移量管理
         this.consumerOffsetManager = messageStoreConfig.isEnableLmq() ? new LmqConsumerOffsetManager(this) : new ConsumerOffsetManager(this);
@@ -331,7 +331,7 @@ public class BrokerController {
         this.replyMessageProcessor = new ReplyMessageProcessor(this);
         //消息到达监听器，当消息抵达的时候，会通知pullRequestHoldService、popMessageProcessor、notificationProcessor
         this.messageArrivingListener = new NotifyMessageArrivingListener(this.pullRequestHoldService, this.popMessageProcessor, this.notificationProcessor);
-        //TODO1
+        //消费者ID改变监听器
         this.consumerIdsChangeListener = new DefaultConsumerIdsChangeListener(this);
         //消费者管理
         this.consumerManager = new ConsumerManager(this.consumerIdsChangeListener, this.brokerStatsManager, this.brokerConfig);
@@ -1689,7 +1689,7 @@ public class BrokerController {
         //TODO changeSpecialServiceStatus
         if (!isIsolated && !this.messageStoreConfig.isEnableDLegerCommitLog() && !this.messageStoreConfig.isDuplicationEnable()) {
             /**
-             *主从模式下，会根据节点类型改变一些服务的状态
+             *会根据节点类型改变一些服务的状态
              */
             changeSpecialServiceStatus(this.brokerConfig.getBrokerId() == MixAll.MASTER_ID);
             this.registerBrokerAll(true, false, true);
@@ -2117,11 +2117,11 @@ public class BrokerController {
                 brokerAttachedPlugin.statusChanged(shouldStart);
             }
         }
-        //改变定时任务(延迟级别的定时任务)启动状态
+        //master节点会启动定时任务和时间轮消息
         changeScheduleServiceStatus(shouldStart);
-        //改变事务消息check状态（true会开一个线程，固定时间去check事务消息）
+        //改变事务消息check状态（主节点true会开一个线程，固定时间去check事务消息）
         changeTransactionCheckServiceStatus(shouldStart);
-
+        //启动pop的ack处理器
         if (this.ackMessageProcessor != null) {
             LOG.info("Set PopReviveService Status to {}", shouldStart);
             this.ackMessageProcessor.setPopReviveServiceStatus(shouldStart);
