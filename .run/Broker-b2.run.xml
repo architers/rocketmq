@@ -1,0 +1,17 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Broker-b2" type="Application" factoryName="Application" folderName="controller-2m-4s">
+    <option name="MAIN_CLASS_NAME" value="org.apache.rocketmq.broker.BrokerStartup" />
+    <module name="rocketmq-broker" />
+    <option name="PROGRAM_PARAMETERS" value="-c F:\workspace\my\rocketmq\conf\controller\2m-4s\broker-b2.properties" />
+    <option name="VM_PARAMETERS" value="-Xmx300m" />
+    <extension name="coverage">
+      <pattern>
+        <option name="PATTERN" value="org.apache.rocketmq.broker.*" />
+        <option name="ENABLED" value="true" />
+      </pattern>
+    </extension>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
