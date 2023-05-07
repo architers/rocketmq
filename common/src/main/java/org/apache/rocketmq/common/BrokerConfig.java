@@ -230,7 +230,9 @@ public class BrokerConfig extends BrokerIdentity {
     private int popCkMaxBufferSize = 200000;
     private int popCkOffsetMaxQueueSize = 20000;
     private boolean enableNotifyAfterPopOrderLockRelease = true;
-
+    /**
+     * 是否实时通知消费ID改变
+     */
     private boolean realTimeNotifyConsumerChange = true;
 
     private boolean litePullMessageEnable = true;
