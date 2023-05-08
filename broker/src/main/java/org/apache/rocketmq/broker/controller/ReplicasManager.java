@@ -117,9 +117,13 @@ public class ReplicasManager {
     }
 
     public void start() {
+        //更新controller地址（启动执行）
         updateControllerAddr();
+        //扫描可用的的controller地址（启动执行））
         scanAvailableControllerAddresses();
+        //更新controller地址（定时执行）
         this.scheduledService.scheduleAtFixedRate(this::updateControllerAddr, 2 * 60 * 1000, 2 * 60 * 1000, TimeUnit.MILLISECONDS);
+        ///扫描可用的的controller地址（启动执行））
         this.scheduledService.scheduleAtFixedRate(this::scanAvailableControllerAddresses, 3 * 1000, 3 * 1000, TimeUnit.MILLISECONDS);
         if (!startBasicService()) {
             LOGGER.error("Failed to start replicasManager");
@@ -143,6 +147,7 @@ public class ReplicasManager {
 
     private boolean startBasicService() {
         if (this.state == State.INITIAL) {
+            //定时同步controller元数据
             if (schedulingSyncControllerMetadata()) {
                 LOGGER.info("First time sync controller metadata success");
                 this.state = State.FIRST_TIME_SYNC_CONTROLLER_METADATA_DONE;
@@ -150,7 +155,7 @@ public class ReplicasManager {
                 return false;
             }
         }
-
+        //首次完成同步控制器元数据
         if (this.state == State.FIRST_TIME_SYNC_CONTROLLER_METADATA_DONE) {
             if (registerBrokerToController()) {
                 LOGGER.info("First time register broker success");
@@ -159,7 +164,7 @@ public class ReplicasManager {
                 return false;
             }
         }
-
+        //定时同步broker元数据
         schedulingSyncBrokerMetadata();
 
         // Register syncStateSet changed listener.
@@ -214,6 +219,7 @@ public class ReplicasManager {
                 this.executorService.submit(() -> {
                     // Register broker to name-srv
                     try {
+                        //主节点注册topicConfig到namesrv
                         this.brokerController.registerBrokerAll(true, false, this.brokerController.getBrokerConfig().isForceRegister());
                     } catch (final Throwable e) {
                         LOGGER.error("Error happen when register broker to name-srv, Failed to change broker to master", e);
@@ -238,6 +244,7 @@ public class ReplicasManager {
 
                 // Change config
                 this.brokerController.getMessageStoreConfig().setBrokerRole(BrokerRole.SLAVE);
+                //关闭为主节点的一些服务（事务检查、时间轮消息等）
                 this.brokerController.changeSpecialServiceStatus(false);
                 this.brokerConfig.setBrokerId(brokerId);
 
@@ -309,8 +316,10 @@ public class ReplicasManager {
             final String newMasterAddress = registerResponse.getMasterAddress();
             if (StringUtils.isNoneEmpty(newMasterAddress)) {
                 if (StringUtils.equals(newMasterAddress, this.localAddress)) {
+                    //改变当前节点为master
                     changeToMaster(registerResponse.getMasterEpoch(), registerResponse.getSyncStateSetEpoch());
                 } else {
+                    //改变当前节点为master
                     changeToSlave(newMasterAddress, registerResponse.getMasterEpoch(), registerResponse.getBrokerId());
                 }
                 // Set isolated to false, make broker can register to namesrv regularly
@@ -381,6 +390,7 @@ public class ReplicasManager {
 
     /**
      * Scheduling sync controller medata.
+     * 定时同步controller元数据，也就是controllerLeaderAddress,知道谁是领导者（master)
      */
     private boolean schedulingSyncControllerMetadata() {
         // Get controller metadata first.
@@ -388,6 +398,7 @@ public class ReplicasManager {
         while (tryTimes < 3) {
             boolean flag = updateControllerMetadata();
             if (flag) {
+                //增加定时任务定时更新controller元数据
                 this.scheduledService.scheduleAtFixedRate(this::updateControllerMetadata, 1000 * 3, this.brokerConfig.getSyncControllerMetadataPeriod(), TimeUnit.MILLISECONDS);
                 return true;
             }
