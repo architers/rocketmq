@@ -343,9 +343,9 @@ public class BrokerController {
         this.consumerOrderInfoManager = new ConsumerOrderInfoManager(this);
         //TODO1
         this.popInflightMessageCounter = new PopInflightMessageCounter(this);
-        //TODO1
+        //扫描异常的client
         this.clientHousekeepingService = new ClientHousekeepingService(this);
-        //TODO1
+        //broker调用client
         this.broker2Client = new Broker2Client(this);
         //订阅组管理器
         this.subscriptionGroupManager = messageStoreConfig.isEnableLmq() ? new LmqSubscriptionGroupManager(this) : new SubscriptionGroupManager(this);
@@ -689,7 +689,7 @@ public class BrokerController {
 
         /*
          *在开启DLeger主从的情况下：
-         * 当是从节点的情况下，会定时同步TimerCheckpoint
+         * 当是从节点的情况下，会定时从主节点同步TimerCheckpoint
          * 当是主节点的情况下，会定时打印没有同步commitLog的字节数据
          */
         if (!messageStoreConfig.isEnableDLegerCommitLog() && !messageStoreConfig.isDuplicationEnable() && !brokerConfig.isEnableControllerMode()) {
@@ -711,13 +711,12 @@ public class BrokerController {
                                 lastSyncTimeMs = System.currentTimeMillis();
                             }
                             //timer checkpoint, latency-sensitive, so sync it more frequently
-                            //TODO1 syncTimerCheckPoint有何作用
                             BrokerController.this.getSlaveSynchronize().syncTimerCheckPoint();
                         } catch (Throwable e) {
                             LOG.error("Failed to sync all config for slave.", e);
                         }
                     }
-                    //10秒后，每3秒同步一次imerCheckPoint
+                    //10秒后，每3秒同步一次TimerCheckPoint
                 }, 1000 * 10, 3 * 1000, TimeUnit.MILLISECONDS);
 
             } else {
@@ -735,7 +734,7 @@ public class BrokerController {
                 }, 1000 * 10, 1000 * 60, TimeUnit.MILLISECONDS);
             }
         }
-
+        //如果开启了controller模式，就updateMasterHAServerAddrPeriodically(定时更新masterHaService地址)为true
         if (this.brokerConfig.isEnableControllerMode()) {
             this.updateMasterHAServerAddrPeriodically = true;
         }
@@ -814,14 +813,16 @@ public class BrokerController {
                 DefaultMessageStore defaultMessageStore = new DefaultMessageStore(this.messageStoreConfig, this.brokerStatsManager, this.messageArrivingListener, this.brokerConfig);
                 defaultMessageStore.setTopicConfigTable(topicConfigManager.getTopicConfigTable());
 
-                //TODO1 DLeger什么鬼
+                //DLeger架构
                 if (messageStoreConfig.isEnableDLegerCommitLog()) {
                     DLedgerRoleChangeHandler roleChangeHandler = new DLedgerRoleChangeHandler(this, defaultMessageStore);
                     ((DLedgerCommitLog) defaultMessageStore.getCommitLog()).getdLedgerServer().getDLedgerLeaderElector().addRoleChangeHandler(roleChangeHandler);
                 }
+                //broker统计
                 this.brokerStats = new BrokerStats(defaultMessageStore);
-                //load plugin
+                //load plugin(TODO2)
                 MessageStorePluginContext context = new MessageStorePluginContext(messageStoreConfig, brokerStatsManager, messageArrivingListener, brokerConfig, configuration);
+
                 this.messageStore = MessageStoreFactory.build(context, defaultMessageStore);
                 this.messageStore.getDispatcherList().addFirst(new CommitLogDispatcherCalcBitMap(this.brokerConfig, this.consumerFilterManager));
                 if (this.brokerConfig.isEnableControllerMode()) {
@@ -1625,7 +1626,7 @@ public class BrokerController {
         if (this.topicQueueMappingCleanService != null) {
             this.topicQueueMappingCleanService.start();
         }
-
+        //文件观察service(用户观察TLS文件）
         if (this.fileWatchService != null) {
             this.fileWatchService.start();
         }
@@ -1635,13 +1636,14 @@ public class BrokerController {
         }
 
         if (this.clientHousekeepingService != null) {
+            //扫描异常客户端channel
             this.clientHousekeepingService.start();
         }
 
         if (this.filterServerManager != null) {
             this.filterServerManager.start();
         }
-
+        //broker统计管理器启动
         if (this.brokerStatsManager != null) {
             this.brokerStatsManager.start();
         }
@@ -1650,6 +1652,7 @@ public class BrokerController {
             this.brokerFastFailure.start();
         }
 
+        //启动广播消费管理器
         if (this.broadcastOffsetManager != null) {
             this.broadcastOffsetManager.start();
         }
@@ -1686,16 +1689,15 @@ public class BrokerController {
         //启动基础服务
         startBasicService();
 
-        //TODO changeSpecialServiceStatus
         if (!isIsolated && !this.messageStoreConfig.isEnableDLegerCommitLog() && !this.messageStoreConfig.isDuplicationEnable()) {
-            /**
+            /*
              *会根据节点类型改变一些服务的状态
              */
             changeSpecialServiceStatus(this.brokerConfig.getBrokerId() == MixAll.MASTER_ID);
             this.registerBrokerAll(true, false, true);
         }
 
-        //添加定时任务，注册broker信息（10秒后启动，定时任务的时间在10-60秒之间）
+        //添加定时任务，注册broker的topicConfig信息（10秒后启动，默认30秒注册一次->定时任务的时间在10-60秒之间）
         scheduledFutures.add(this.scheduledExecutorService.scheduleAtFixedRate(new AbstractBrokerRunnable(this.getBrokerIdentity()) {
             @Override
             public void run0() {
@@ -1715,7 +1717,7 @@ public class BrokerController {
             }
         }, 1000 * 10, Math.max(10000, Math.min(brokerConfig.getRegisterNameServerPeriod(), 60000)), TimeUnit.MILLISECONDS));
 
-        // 从切换为主节点，就定时向namesrv发送心跳，并定时同步broker成员信息
+        // 如果从节点能够扮演主节点，就定时向namesrv发送心跳，并定时同步broker成员信息（默认1s)-->主从模式
         if (this.brokerConfig.isEnableSlaveActingMaster()) {
             scheduleSendHeartbeat();
 
@@ -1732,7 +1734,7 @@ public class BrokerController {
         }
 
         if (this.brokerConfig.isEnableControllerMode()) {
-            // 主从模式下，定时向namesrv发送心跳
+            // controller模式下，定时向namesrv发送心跳
             scheduleSendHeartbeat();
         }
 
@@ -1741,6 +1743,9 @@ public class BrokerController {
         }
     }
 
+    /**
+     * 定时发送心跳(默认1s)
+     */
     protected void scheduleSendHeartbeat() {
         scheduledFutures.add(this.brokerHeartbeatExecutorService.scheduleAtFixedRate(new AbstractBrokerRunnable(this.getBrokerIdentity()) {
             @Override

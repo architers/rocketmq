@@ -39,6 +39,9 @@ public class ClientHousekeepingService implements ChannelEventListener {
             new ThreadFactoryImpl("ClientHousekeepingScheduledThread", brokerController.getBrokerIdentity()));
     }
 
+    /**
+     * 扫描异常的channel（默认10s)
+     */
     public void start() {
 
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {

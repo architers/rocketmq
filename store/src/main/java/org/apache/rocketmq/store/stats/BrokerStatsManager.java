@@ -40,6 +40,9 @@ import org.apache.rocketmq.common.stats.MomentStatsItemSet;
 import org.apache.rocketmq.common.stats.StatsItem;
 import org.apache.rocketmq.common.stats.StatsItemSet;
 
+/**
+ * broker统计管理器-更细的维度
+ */
 public class BrokerStatsManager {
 
     @Deprecated public static final String QUEUE_PUT_NUMS = Stats.QUEUE_PUT_NUMS;

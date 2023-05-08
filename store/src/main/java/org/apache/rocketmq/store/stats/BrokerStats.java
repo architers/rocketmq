@@ -22,7 +22,7 @@ import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 import org.apache.rocketmq.store.MessageStore;
 
 /**
- * broker状态记录
+ * broker统计（大维度）
  * <li>每天凌晨0点执行(也就是12点执行），记录累计到前天、昨天的生产以及消费消息的总数。</li>
  */
 public class BrokerStats {
