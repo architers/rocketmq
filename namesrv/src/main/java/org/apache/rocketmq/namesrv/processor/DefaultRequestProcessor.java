@@ -89,22 +89,31 @@ public class DefaultRequestProcessor implements NettyRequestProcessor {
 
         switch (request.getCode()) {
             case RequestCode.PUT_KV_CONFIG:
+                //put kv配置
                 return this.putKVConfig(ctx, request);
             case RequestCode.GET_KV_CONFIG:
+                //得到kv 配置
                 return this.getKVConfig(ctx, request);
             case RequestCode.DELETE_KV_CONFIG:
+                //删除kv配置
                 return this.deleteKVConfig(ctx, request);
             case RequestCode.QUERY_DATA_VERSION:
+                //查询broker dataVersion版本
                 return this.queryBrokerTopicConfig(ctx, request);
             case RequestCode.REGISTER_BROKER:
+                //注册broker
                 return this.registerBroker(ctx, request);
             case RequestCode.UNREGISTER_BROKER:
+                //取消注册broker
                 return this.unregisterBroker(ctx, request);
             case RequestCode.BROKER_HEARTBEAT:
+                //broker心跳
                 return this.brokerHeartbeat(ctx, request);
             case RequestCode.GET_BROKER_MEMBER_GROUP:
+                //查询单个集群的broker分片信息（主从信息）
                 return this.getBrokerMemberGroup(ctx, request);
             case RequestCode.GET_BROKER_CLUSTER_INFO:
+                //查询broker所有的集群信息
                 return this.getBrokerClusterInfo(ctx, request);
             case RequestCode.WIPE_WRITE_PERM_OF_BROKER:
                 return this.wipeWritePermOfBroker(ctx, request);
