@@ -68,7 +68,7 @@ public class KVConfigManager {
                     this.configTable.put(namespace, kvTable);
                     log.info("putKVConfig create new Namespace {}", namespace);
                 }
-
+                //有就修改，没有就新增
                 final String prev = kvTable.put(key, value);
                 if (null != prev) {
                     log.info("putKVConfig update config item, Namespace: {} Key: {} Value: {}",
@@ -87,6 +87,9 @@ public class KVConfigManager {
         this.persist();
     }
 
+    /**
+     * 持久化kv配置
+     */
     public void persist() {
         try {
             this.lock.readLock().lockInterruptibly();
