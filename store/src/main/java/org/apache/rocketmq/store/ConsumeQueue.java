@@ -564,6 +564,7 @@ public class ConsumeQueue implements ConsumeQueueInterface, FileQueueLifeCycle {
                     this.messageStore.getStoreCheckpoint().setPhysicMsgTimestamp(request.getStoreTimestamp());
                 }
                 this.messageStore.getStoreCheckpoint().setLogicsMsgTimestamp(request.getStoreTimestamp());
+                //多重分发（LMQ)
                 if (checkMultiDispatchQueue(request)) {
                     multiDispatchLmqQueue(request, maxRetries);
                 }

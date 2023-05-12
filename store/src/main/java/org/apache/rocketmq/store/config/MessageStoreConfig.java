@@ -224,6 +224,10 @@ public class MessageStoreConfig {
     private int putMessageTimeout = 1000 * 8;
     private int slaveTimeout = 3000;
     private String messageDelayLevel = "1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h";
+
+    /**
+     * 刷新延迟级别消息offset时间间隔
+     */
     private long flushDelayOffsetInterval = 1000 * 10;
     /**
      * 是否强制清理文件
@@ -264,6 +268,10 @@ public class MessageStoreConfig {
     private int maxLmqConsumeQueueNum = 20000;
 
     private boolean enableScheduleAsyncDeliver = false;
+
+    /**
+     * 定时任务异步传递最大待处理限制
+     */
     private int scheduleAsyncDeliverMaxPendingLimit = 2000;
     private int scheduleAsyncDeliverMaxResendNum2Blocked = 3;
 
