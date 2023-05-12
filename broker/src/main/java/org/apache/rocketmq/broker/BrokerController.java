@@ -852,7 +852,7 @@ public class BrokerController {
         }
 
         //scheduleMessageService load after messageStore load success
-        //加载延迟级别的定时任务
+        //加载延迟级别的定时任务的配置
         result = result && this.scheduleMessageService.load();
 
         //加载broker附件插件（默认的情况下是没有的)

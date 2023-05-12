@@ -23,6 +23,10 @@ import org.apache.rocketmq.common.UtilAll;
 public class TopicValidator {
 
     public static final String AUTO_CREATE_TOPIC_KEY_TOPIC = "TBW102"; // Will be created at broker when isAutoCreateTopicEnable
+
+    /**
+     * 延迟级别消息对应的topic
+     */
     public static final String RMQ_SYS_SCHEDULE_TOPIC = "SCHEDULE_TOPIC_XXXX";
     public static final String RMQ_SYS_BENCHMARK_TOPIC = "BenchmarkTest";
     /**
