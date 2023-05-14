@@ -1826,7 +1826,7 @@ public class DefaultMessageStore implements MessageStore {
     private void addScheduleTask() {
 
         /*
-         * 定期清理文件（默认每十秒指定一次）
+         * 定期清理文件（默认每十秒执行一次）
          */
         this.scheduledExecutorService.scheduleAtFixedRate(new AbstractBrokerRunnable(this.getBrokerIdentity()) {
             @Override
@@ -1885,7 +1885,7 @@ public class DefaultMessageStore implements MessageStore {
      * 定期清理文件
      */
     private void cleanFilesPeriodically() {
-        //清理broker文件
+        //清理broker的commitLog文件
         this.cleanCommitLogService.run();
         //清理consumeQueue文件（会跟commitLog的最小偏移量对比，如果commitLog的最小偏移量>consumeQueue文件的最大偏移量，就会删除）
         this.cleanConsumeQueueService.run();
@@ -2286,7 +2286,7 @@ public class DefaultMessageStore implements MessageStore {
             int deletePhysicFilesInterval = DefaultMessageStore.this.getMessageStoreConfig().getDeleteCommitLogFilesInterval();
             //强制删除的时间间隔（第一次删除拒绝之后，在这个时间内这个文件不能被删除，当超过这个时间之后，则可以被删除）
             int destroyMappedFileIntervalForcibly = DefaultMessageStore.this.getMessageStoreConfig().getDestroyMapedFileIntervalForcibly();
-            //最多批量文件大小
+            //最多批量文件大小（默认10）
             int deleteFileBatchMax = DefaultMessageStore.this.getMessageStoreConfig().getDeleteFileBatchMax();
             //是不是删除的时间（默认情况下凌晨4点删除文件）
             boolean isTimeUp = this.isTimeToDelete();
@@ -2294,13 +2294,13 @@ public class DefaultMessageStore implements MessageStore {
             boolean isUsageExceedsThreshold = this.isSpaceToDelete();
             //是否手动删除
             boolean isManualDelete = this.manualDeleteFileSeveralTimes > 0;
-
+            //定时删除|空间不足删除|手动删除
             if (isTimeUp || isUsageExceedsThreshold || isManualDelete) {
 
                 if (isManualDelete) {
                     this.manualDeleteFileSeveralTimes--;
                 }
-
+                //是否立即清理
                 boolean cleanAtOnce = DefaultMessageStore.this.getMessageStoreConfig().isCleanFileForciblyEnable() && this.cleanImmediately;
 
                 LOGGER.info("begin to delete before {} hours file. isTimeUp: {} isUsageExceedsThreshold: {} manualDeleteFileSeveralTimes: {} cleanAtOnce: {} deleteFileBatchMax: {}",
@@ -2320,6 +2320,7 @@ public class DefaultMessageStore implements MessageStore {
                     if (DefaultMessageStore.this.brokerConfig.isEnableControllerMode()) {
                         if (DefaultMessageStore.this.haService instanceof AutoSwitchHAService) {
                             final long minPhyOffset = getMinPhyOffset();
+                            //TODO1
                             ((AutoSwitchHAService) DefaultMessageStore.this.haService).truncateEpochFilePrefix(minPhyOffset - 1);
                         }
                     }

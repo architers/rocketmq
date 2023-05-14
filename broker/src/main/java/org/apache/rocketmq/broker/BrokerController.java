@@ -689,7 +689,7 @@ public class BrokerController {
 
         /*
          *在开启DLeger主从的情况下：
-         * 当是从节点的情况下，会定时从主节点同步TimerCheckpoint
+         * 当是从节点的情况下，会定时从主节点同步TimerCheckpoint,并同步其他主节点信息（consumeOffset、消息组信息等）
          * 当是主节点的情况下，会定时打印没有同步commitLog的字节数据
          */
         if (!messageStoreConfig.isEnableDLegerCommitLog() && !messageStoreConfig.isDuplicationEnable() && !brokerConfig.isEnableControllerMode()) {
@@ -1614,7 +1614,9 @@ public class BrokerController {
         }
 
         if (this.popMessageProcessor != null) {
+            //启动pop长轮训service
             this.popMessageProcessor.getPopLongPollingService().start();
+
             this.popMessageProcessor.getPopBufferMergeService().start();
             this.popMessageProcessor.getQueueLockManager().start();
         }

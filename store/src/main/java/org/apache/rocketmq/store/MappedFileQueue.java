@@ -387,6 +387,7 @@ public class MappedFileQueue implements Swappable {
             for (int i = 0; i < mfsLength; i++) {
                 MappedFile mappedFile = (MappedFile) mfs[i];
                 long liveMaxTimestamp = mappedFile.getLastModifiedTimestamp() + expiredTime;
+                //如果当前时间>=文件最后修改时间+过期时间（默认3天） 或者 立即清理（磁盘超过限制）
                 if (System.currentTimeMillis() >= liveMaxTimestamp || cleanImmediately) {
                     if (skipFileNum > 0) {
                         log.info("Delete CommitLog {} but skip {} files", mappedFile.getFileName(), skipFileNum);

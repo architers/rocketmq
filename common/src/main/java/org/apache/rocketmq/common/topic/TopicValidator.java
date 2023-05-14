@@ -118,7 +118,7 @@ public class TopicValidator {
         if (isTopicOrGroupIllegal(topic)) {
             return new ValidateTopicResult(false, "The specified topic contains illegal characters, allowing only ^[%|a-zA-Z0-9_-]+$");
         }
-
+        //长度不能超过127
         if (topic.length() > TOPIC_MAX_LENGTH) {
             return new ValidateTopicResult(false, "The specified topic is longer than topic max length.");
         }
