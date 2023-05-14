@@ -534,6 +534,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
             return;
         }
 
+        //如果本地需要pop的ack消息超过阈值,就稍后再拉取，并把控流次数+1,到了一千次就打印一次
         if (processQueue.getWaiAckMsgCount() > this.defaultMQPushConsumer.getPopThresholdForQueue()) {
             this.executePopPullRequestLater(popRequest, PULL_TIME_DELAY_MILLS_WHEN_CACHE_FLOW_CONTROL);
             if ((queueFlowControlTimes++ % 1000) == 0) {
@@ -544,6 +545,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         }
 
         //POPTODO think of pop mode orderly implementation later.
+        //没有订阅组信息，就稍后再拉取
         final SubscriptionData subscriptionData = this.rebalanceImpl.getSubscriptionInner().get(popRequest.getMessageQueue().getTopic());
         if (null == subscriptionData) {
             this.executePopPullRequestLater(popRequest, pullTimeDelayMillsWhenException);
@@ -619,7 +621,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
 
 
         try {
-
+            //得到消息不可见时间（在5-300s之前，超过就默认为1分钟）
             long invisibleTime = this.defaultMQPushConsumer.getPopInvisibleTime();
             if (invisibleTime < MIN_POP_INVISIBLE_TIME || invisibleTime > MAX_POP_INVISIBLE_TIME) {
                 invisibleTime = 60000;

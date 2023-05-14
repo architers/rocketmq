@@ -121,6 +121,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         this.topicCidMap = new ConcurrentHashMap<>(this.brokerController.getBrokerConfig().getPopPollingMapSize());
         this.pollingMap = new ConcurrentLinkedHashMap.Builder<String, ConcurrentSkipListSet<PopRequest>>()
             .maximumWeightedCapacity(this.brokerController.getBrokerConfig().getPopPollingMapSize()).build();
+        //pop长轮训servcie
         this.popLongPollingService = new PopLongPollingService();
         this.queueLockManager = new QueueLockManager();
         this.popBufferMergeService = new PopBufferMergeService(this.brokerController, this);
@@ -237,6 +238,9 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         return wakeUp(popRequest);
     }
 
+    /**
+     *唤醒长轮训
+     */
     private boolean wakeUp(final PopRequest request) {
         if (request == null || !request.complete()) {
             return false;
@@ -281,19 +285,20 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         //补偿消费者信息
         brokerController.getConsumerManager().compensateBasicConsumerInfo(requestHeader.getConsumerGroup(),
             ConsumeType.CONSUME_POP, MessageModel.CLUSTERING);
-
+        //设置为不透明
         response.setOpaque(request.getOpaque());
 
         if (brokerController.getBrokerConfig().isEnablePopLog()) {
             POP_LOGGER.info("receive PopMessage request command, {}", request);
         }
-
+        //判断是否超时
         if (requestHeader.isTimeoutTooMuch()) {
             response.setCode(ResponseCode.POLLING_TIMEOUT);
             response.setRemark(String.format("the broker[%s] poping message is timeout too much",
                 this.brokerController.getBrokerConfig().getBrokerIP1()));
             return response;
         }
+        //判断broker是否有读的权限
         if (!PermName.isReadable(this.brokerController.getBrokerConfig().getBrokerPermission())) {
             response.setCode(ResponseCode.NO_PERMISSION);
             response.setRemark(String.format("the broker[%s] poping message is forbidden",
@@ -462,10 +467,12 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                 getMessageResult.setStatus(GetMessageStatus.FOUND);
                 if (restNum > 0) {
                     // all queue pop can not notify specified queue pop, and vice versa
+                    //通知消息到达，缓存长轮训
                     notifyMessageArriving(requestHeader.getTopic(), requestHeader.getConsumerGroup(),
                         requestHeader.getQueueId());
                 }
             } else {
+                //没有pop到消息，就保存轮训信息
                 int pollingResult = polling(channel, request, requestHeader);
                 if (POLLING_SUC == pollingResult) {
                     return null;
@@ -536,6 +543,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         PopMessageRequestHeader requestHeader, int queueId, long restNum, int reviveQid,
         Channel channel, long popTime, ExpressionMessageFilter messageFilter, StringBuilder startOffsetInfo,
         StringBuilder msgOffsetInfo, StringBuilder orderCountInfo) {
+        //得到topic,popMessage重试队列的topic为%RETRY%消费组_topic
         String topic = isRetry ? KeyBuilder.buildPopRetryTopic(requestHeader.getTopic(),
             requestHeader.getConsumerGroup()) : requestHeader.getTopic();
         String lockKey =
@@ -754,6 +762,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         cids.putIfAbsent(requestHeader.getConsumerGroup(), Byte.MIN_VALUE);
         long expired = requestHeader.getBornTime() + requestHeader.getPollTime();
         final PopRequest request = new PopRequest(remotingCommand, channel, expired);
+        //默认最大pop数量10万
         boolean isFull = totalPollingNum.get() >= this.brokerController.getBrokerConfig().getMaxPopPollingSize();
         if (isFull) {
             POP_LOGGER.info("polling {}, result POLLING_FULL, total:{}", remotingCommand, totalPollingNum.get());
@@ -778,12 +787,14 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         } else {
             // check size
             int size = queue.size();
+            //默认轮训数量为1024
             if (size > brokerController.getBrokerConfig().getPopPollingSize()) {
                 POP_LOGGER.info("polling {}, result POLLING_FULL, singleSize:{}", remotingCommand, size);
                 return POLLING_FULL;
             }
         }
         if (queue.add(request)) {
+            //请求挂起
             remotingCommand.setSuspended(true);
             totalPollingNum.incrementAndGet();
             if (brokerController.getBrokerConfig().isEnablePopLog()) {
@@ -879,7 +890,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
     }
 
     /**
-     * 长轮训service
+     * pop长轮训service
      */
     public class PopLongPollingService extends ServiceThread {
 
@@ -909,6 +920,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                         while (cidMapIter.hasNext()) {
                             Entry<String, Byte> cidEntry = cidMapIter.next();
                             String cid = cidEntry.getKey();
+                            //订阅组中已经不存在，就移除
                             if (!brokerController.getSubscriptionGroupManager().getSubscriptionGroupTable().containsKey(cid)) {
                                 POP_LOGGER.info("remove not exit sub {} of topic {} in topicCidMap!", cid, topic);
                                 cidMapIter.remove();
@@ -930,11 +942,13 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                         }
                         String topic = keyArray[0];
                         String cid = keyArray[1];
+                        //移除topicConfig中存在的topic对应的轮训信息
                         if (brokerController.getTopicConfigManager().selectTopicConfig(topic) == null) {
                             POP_LOGGER.info("remove not exit topic {} in pollingMap!", topic);
                             pollingMapIter.remove();
                             continue;
                         }
+                        //订阅组中已经不存在，就移除
                         if (!brokerController.getSubscriptionGroupManager().getSubscriptionGroupTable().containsKey(cid)) {
                             POP_LOGGER.info("remove not exit sub {} of topic {} in pollingMap!", cid, topic);
                             pollingMapIter.remove();
@@ -974,7 +988,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                             if (first == null) {
                                 break;
                             }
-                            //TODO2 任务超时为什么还要放回队列中
+                            //没有超时，就又放到队列中
                             if (!first.isTimeout()) {
                                 if (popQ.add(first)) {
                                     break;
@@ -986,7 +1000,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                                 POP_LOGGER.info("timeout , wakeUp polling : {}", first);
                             }
                             totalPollingNum.decrementAndGet();
-                            //唤醒轮训的popRequest
+                            //唤醒第一个轮训的popRequest
                             wakeUp(first);
                         }
                         while (true);
@@ -1007,7 +1021,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                         i = 0;
                     }
 
-                    // clean unused
+                    // clean unused（30分钟就清理一次无用的信息）
                     if (lastCleanTime == 0 || System.currentTimeMillis() - lastCleanTime > 5 * 60 * 1000) {
                         cleanUnusedResource();
                     }
