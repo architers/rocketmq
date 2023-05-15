@@ -927,7 +927,10 @@ public class MQClientAPIImpl implements NameServerUpdateCallback {
         });
     }
 
-    public void changeInvisibleTimeAsync(//
+    /**
+     * 异步改变不可见时间
+     */
+    public void changeInvisibleTimeAsync(
         final String brokerName,
         final String addr, //
         final ChangeInvisibleTimeRequestHeader requestHeader,//

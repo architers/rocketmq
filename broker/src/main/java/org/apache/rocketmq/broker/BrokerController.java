@@ -1622,6 +1622,7 @@ public class BrokerController {
         }
 
         if (this.ackMessageProcessor != null) {
+            //启动pop消息恢复的service
             this.ackMessageProcessor.startPopReviveService();
         }
 

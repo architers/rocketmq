@@ -132,6 +132,7 @@ public class AckMessageProcessor implements NettyRequestProcessor {
         }
         long minOffset = this.brokerController.getMessageStore().getMinOffsetInQueue(requestHeader.getTopic(), requestHeader.getQueueId());
         long maxOffset = this.brokerController.getMessageStore().getMaxOffsetInQueue(requestHeader.getTopic(), requestHeader.getQueueId());
+        //ack的offset不在最小与最大偏移量的范围内
         if (requestHeader.getOffset() < minOffset || requestHeader.getOffset() > maxOffset) {
             String errorInfo = String.format("offset is illegal, key:%s@%d, commit:%d, store:%d~%d",
                 requestHeader.getTopic(), requestHeader.getQueueId(), requestHeader.getOffset(), minOffset, maxOffset);
@@ -226,7 +227,9 @@ public class AckMessageProcessor implements NettyRequestProcessor {
             && putMessageResult.getPutMessageStatus() != PutMessageStatus.SLAVE_NOT_AVAILABLE) {
             POP_LOGGER.error("put ack msg error:" + putMessageResult);
         }
+        //增加pop接收ack 的put数量
         PopMetricsManager.incPopReviveAckPutCount(ackMsg, putMessageResult.getPutMessageStatus());
+        //减少不可见消息数量
         decInFlightMessageNum(requestHeader);
         return response;
     }

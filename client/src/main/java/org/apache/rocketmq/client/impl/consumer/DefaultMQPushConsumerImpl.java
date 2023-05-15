@@ -807,6 +807,9 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         this.mQClientFactory.getDefaultMQProducer().send(newMsg);
     }
 
+    /**
+     * 异步ack pop消息
+     */
     void ackAsync(MessageExt message, String consumerGroup) {
         final String extraInfo = message.getProperty(MessageConst.PROPERTY_POP_CK);
 

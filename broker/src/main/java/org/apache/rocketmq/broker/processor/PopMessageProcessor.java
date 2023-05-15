@@ -121,7 +121,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         this.topicCidMap = new ConcurrentHashMap<>(this.brokerController.getBrokerConfig().getPopPollingMapSize());
         this.pollingMap = new ConcurrentLinkedHashMap.Builder<String, ConcurrentSkipListSet<PopRequest>>()
             .maximumWeightedCapacity(this.brokerController.getBrokerConfig().getPopPollingMapSize()).build();
-        //pop长轮训servcie
+        //pop长轮训service
         this.popLongPollingService = new PopLongPollingService();
         this.queueLockManager = new QueueLockManager();
         this.popBufferMergeService = new PopBufferMergeService(this.brokerController, this);
