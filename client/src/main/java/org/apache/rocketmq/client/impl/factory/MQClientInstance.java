@@ -565,36 +565,6 @@ public class MQClientInstance {
         }
     }
 
-    private void uploadFilterClassSource() {
-        for (Entry<String, MQConsumerInner> next : this.consumerTable.entrySet()) {
-            MQConsumerInner consumer = next.getValue();
-            if (ConsumeType.CONSUME_PASSIVELY != consumer.consumeType()) {
-                continue;
-            }
-            Set<SubscriptionData> subscriptions = consumer.subscriptions();
-            for (SubscriptionData sub : subscriptions) {
-                if (sub.isClassFilterMode() && sub.getFilterClassSource() != null) {
-                    final String consumerGroup = consumer.groupName();
-                    final String className = sub.getSubString();
-                    final String topic = sub.getTopic();
-                    final String filterClassSource = sub.getFilterClassSource();
-                    try {
-                        this.uploadFilterClassToAllFilterServer(consumerGroup, className, topic, filterClassSource);
-                    } catch (Exception e) {
-                        log.error("uploadFilterClassToAllFilterServer Exception", e);
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * 从nameServer更新topic路由信息
-     *
-     * @param topic             更新的topic
-     * @param isDefault         是否默认的topic路由信息，是的话就会获取TBW102的路由信息
-     * @param defaultMQProducer 生产者
-     */
     public boolean updateTopicRouteInfoFromNameServer(final String topic, boolean isDefault,
         DefaultMQProducer defaultMQProducer) {
         try {
