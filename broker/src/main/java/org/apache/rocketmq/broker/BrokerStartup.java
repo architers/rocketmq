@@ -91,6 +91,7 @@ public class BrokerStartup {
         // 消息存储配置
         final MessageStoreConfig messageStoreConfig = new MessageStoreConfig();
         nettyServerConfig.setListenPort(10911);
+        messageStoreConfig.setHaListenPort(0);
 
         Options options = ServerUtil.buildCommandlineOptions(new Options());
         CommandLine commandLine = ServerUtil.parseCmdLine(
@@ -175,8 +176,16 @@ public class BrokerStartup {
             //TODO 暂时不知道什么意思
             brokerConfig.setBrokerId(-1);
         }
+
+        if (brokerConfig.isEnableControllerMode() && messageStoreConfig.isEnableDLegerCommitLog()) {
+            System.out.printf("The config enableControllerMode and enableDLegerCommitLog cannot both be true.%n");
+            System.exit(-4);
+        }
         //haListenPort参数是HAService服务组件使用，用于Broker的主从同步
-        messageStoreConfig.setHaListenPort(nettyServerConfig.getListenPort() + 1);
+        if (messageStoreConfig.getHaListenPort() <= 0) {
+            messageStoreConfig.setHaListenPort(nettyServerConfig.getListenPort() + 1);
+        }
+
         brokerConfig.setInBrokerContainer(false);
 
         //设置broker日志目录

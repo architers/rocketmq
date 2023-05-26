@@ -38,6 +38,7 @@ import sun.nio.ch.DirectBuffer;
  */
 public class TransientStorePool {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
+
     private final int poolSize;
     private final int fileSize;
     /**
@@ -45,10 +46,7 @@ public class TransientStorePool {
      */
     private final Deque<ByteBuffer> availableBuffers;
     private final DefaultMessageStore messageStore;
-    /**
-     * 是否整正的提交
-     */
-    private volatile boolean isRealCommit;
+    private volatile boolean isRealCommit = true;
 
     public TransientStorePool(final DefaultMessageStore messageStore) {
         this.messageStore = messageStore;

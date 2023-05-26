@@ -59,7 +59,6 @@ public class ClientHousekeepingService implements ChannelEventListener {
     private void scanExceptionChannel() {
         this.brokerController.getProducerManager().scanNotActiveChannel();
         this.brokerController.getConsumerManager().scanNotActiveChannel();
-        this.brokerController.getFilterServerManager().scanNotActiveChannel();
     }
 
     public void shutdown() {
@@ -75,7 +74,6 @@ public class ClientHousekeepingService implements ChannelEventListener {
     public void onChannelClose(String remoteAddr, Channel channel) {
         this.brokerController.getProducerManager().doChannelCloseEvent(remoteAddr, channel);
         this.brokerController.getConsumerManager().doChannelCloseEvent(remoteAddr, channel);
-        this.brokerController.getFilterServerManager().doChannelCloseEvent(remoteAddr, channel);
         this.brokerController.getBrokerStatsManager().incChannelCloseNum();
     }
 
@@ -83,7 +81,6 @@ public class ClientHousekeepingService implements ChannelEventListener {
     public void onChannelException(String remoteAddr, Channel channel) {
         this.brokerController.getProducerManager().doChannelCloseEvent(remoteAddr, channel);
         this.brokerController.getConsumerManager().doChannelCloseEvent(remoteAddr, channel);
-        this.brokerController.getFilterServerManager().doChannelCloseEvent(remoteAddr, channel);
         this.brokerController.getBrokerStatsManager().incChannelExceptionNum();
     }
 
@@ -91,7 +88,6 @@ public class ClientHousekeepingService implements ChannelEventListener {
     public void onChannelIdle(String remoteAddr, Channel channel) {
         this.brokerController.getProducerManager().doChannelCloseEvent(remoteAddr, channel);
         this.brokerController.getConsumerManager().doChannelCloseEvent(remoteAddr, channel);
-        this.brokerController.getFilterServerManager().doChannelCloseEvent(remoteAddr, channel);
         this.brokerController.getBrokerStatsManager().incChannelIdleNum();
     }
 }

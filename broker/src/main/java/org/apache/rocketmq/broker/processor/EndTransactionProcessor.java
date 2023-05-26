@@ -17,8 +17,10 @@
 package org.apache.rocketmq.broker.processor;
 
 import io.netty.channel.ChannelHandlerContext;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.rocketmq.broker.BrokerController;
 import org.apache.rocketmq.broker.transaction.OperationResult;
+import org.apache.rocketmq.broker.transaction.queue.TransactionalMessageUtil;
 import org.apache.rocketmq.common.TopicFilterType;
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.common.message.MessageAccessor;
@@ -129,7 +131,12 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
             //得到half消息
             result = this.brokerController.getTransactionalMessageService().commitMessage(requestHeader);
             if (result.getResponseCode() == ResponseCode.SUCCESS) {
-                //校验half消息
+                if (rejectCommitOrRollback(requestHeader, result.getPrepareMessage())) {
+                    response.setCode(ResponseCode.ILLEGAL_OPERATION);
+                    LOGGER.warn("Message commit fail [producer end]. currentTimeMillis - bornTime > checkImmunityTime, msgId={},commitLogOffset={}, wait check",
+                            requestHeader.getMsgId(), requestHeader.getCommitLogOffset());
+                    return response;
+                }
                 RemotingCommand res = checkPrepareMessage(result.getPrepareMessage(), requestHeader);
                 if (res.getCode() == ResponseCode.SUCCESS) {
                     //half消息转成的真正的业务topic消息，
@@ -156,6 +163,12 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
             //获取需要回滚的half消息
             result = this.brokerController.getTransactionalMessageService().rollbackMessage(requestHeader);
             if (result.getResponseCode() == ResponseCode.SUCCESS) {
+                if (rejectCommitOrRollback(requestHeader, result.getPrepareMessage())) {
+                    response.setCode(ResponseCode.ILLEGAL_OPERATION);
+                    LOGGER.warn("Message rollback fail [producer end]. currentTimeMillis - bornTime > checkImmunityTime, msgId={},commitLogOffset={}, wait check",
+                            requestHeader.getMsgId(), requestHeader.getCommitLogOffset());
+                    return response;
+                }
                 RemotingCommand res = checkPrepareMessage(result.getPrepareMessage(), requestHeader);
                 if (res.getCode() == ResponseCode.SUCCESS) {
                     //校验通过，删除事务消息
@@ -167,6 +180,30 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
         response.setCode(result.getResponseCode());
         response.setRemark(result.getResponseRemark());
         return response;
+    }
+
+    /**
+     * If you specify a custom first check time CheckImmunityTimeInSeconds,
+     * And the commit/rollback request whose validity period exceeds CheckImmunityTimeInSeconds and is not checked back will be processed and failed
+     * returns ILLEGAL_OPERATION 604 error
+     * @param requestHeader
+     * @param messageExt
+     * @return
+     */
+    public boolean rejectCommitOrRollback(EndTransactionRequestHeader requestHeader, MessageExt messageExt) {
+        if (requestHeader.getFromTransactionCheck()) {
+            return false;
+        }
+        long transactionTimeout = brokerController.getBrokerConfig().getTransactionTimeOut();
+
+        String checkImmunityTimeStr = messageExt.getUserProperty(MessageConst.PROPERTY_CHECK_IMMUNITY_TIME_IN_SECONDS);
+        if (StringUtils.isNotEmpty(checkImmunityTimeStr)) {
+            long valueOfCurrentMinusBorn = System.currentTimeMillis() - messageExt.getBornTimestamp();
+            long checkImmunityTime = TransactionalMessageUtil.getImmunityTime(checkImmunityTimeStr, transactionTimeout);
+            //Non-check requests that exceed the specified custom first check time fail to return
+            return valueOfCurrentMinusBorn > checkImmunityTime;
+        }
+        return false;
     }
 
     @Override
@@ -236,9 +273,9 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
             switch (putMessageResult.getPutMessageStatus()) {
                 // Success
                 case PUT_OK:
-                case FLUSH_DISK_TIMEOUT://刷新磁盘超时
-                case FLUSH_SLAVE_TIMEOUT://刷新到从节点超时
-                case SLAVE_NOT_AVAILABLE://总节点不存在
+                case FLUSH_DISK_TIMEOUT:
+                case FLUSH_SLAVE_TIMEOUT:
+                case SLAVE_NOT_AVAILABLE:
                     response.setCode(ResponseCode.SUCCESS);
                     response.setRemark(null);
                     break;
@@ -275,6 +312,7 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
                     response.setCode(ResponseCode.SYSTEM_ERROR);
                     response.setRemark(String.format("accurate timer message is not enabled, timerWheelEnable is %s",
                         this.brokerController.getMessageStoreConfig().isTimerWheelEnable()));
+                    break;
                 case UNKNOWN_ERROR:
                     response.setCode(ResponseCode.SYSTEM_ERROR);
                     response.setRemark("UNKNOWN_ERROR");

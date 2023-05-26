@@ -312,6 +312,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
         // 判断broker是否有读取的权限
         if (!PermName.isReadable(this.brokerController.getBrokerConfig().getBrokerPermission())) {
             response.setCode(ResponseCode.NO_PERMISSION);
+            responseHeader.setForbiddenType(ForbiddenType.BROKER_FORBIDDEN);
             response.setRemark(String.format("the broker[%s] pulling message is forbidden",
                 this.brokerController.getBrokerConfig().getBrokerIP1()));
             return response;
@@ -320,6 +321,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
         // 如果是LITE_PULL_MESSAGE，看是否开启了litePullMessageEnable
         if (request.getCode() == RequestCode.LITE_PULL_MESSAGE && !this.brokerController.getBrokerConfig().isLitePullMessageEnable()) {
             response.setCode(ResponseCode.NO_PERMISSION);
+            responseHeader.setForbiddenType(ForbiddenType.BROKER_FORBIDDEN);
             response.setRemark(
                 "the broker[" + this.brokerController.getBrokerConfig().getBrokerIP1() + "] for lite pull consumer is forbidden");
             return response;
@@ -333,6 +335,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
             response.setRemark(String.format("subscription group [%s] does not exist, %s", requestHeader.getConsumerGroup(), FAQUrl.suggestTodo(FAQUrl.SUBSCRIPTION_GROUP_NOT_EXIST)));
             return response;
         }
+
         if (!subscriptionGroupConfig.isConsumeEnable()) {
             response.setCode(ResponseCode.NO_PERMISSION);
             responseHeader.setForbiddenType(ForbiddenType.GROUP_FORBIDDEN);
@@ -340,11 +343,6 @@ public class PullMessageProcessor implements NettyRequestProcessor {
             return response;
         }
 
-        final boolean hasCommitOffsetFlag = PullSysFlag.hasCommitOffsetFlag(requestHeader.getSysFlag());
-        //如果有SubscriptionFlag，就每次从请求头中获取subscriptionData，否则从缓存中获取（默认false)
-        final boolean hasSubscriptionFlag = PullSysFlag.hasSubscriptionFlag(requestHeader.getSysFlag());
-
-        //查询topic配置，并判断topic是否能够读
         TopicConfig topicConfig = this.brokerController.getTopicConfigManager().selectTopicConfig(requestHeader.getTopic());
         if (null == topicConfig) {
             LOGGER.error("the topic {} not exist, consumer: {}", requestHeader.getTopic(), RemotingHelper.parseChannelRemoteAddr(channel));
@@ -399,6 +397,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
 
         SubscriptionData subscriptionData = null;
         ConsumerFilterData consumerFilterData = null;
+        final boolean hasSubscriptionFlag = PullSysFlag.hasSubscriptionFlag(requestHeader.getSysFlag());
         if (hasSubscriptionFlag) {
             try {
                 subscriptionData = FilterAPI.build(
