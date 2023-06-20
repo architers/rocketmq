@@ -806,6 +806,9 @@ public class CommitLog implements Swappable {
         }
     }
 
+    /**
+     * 异步putMessage,此处有两把锁：第一个锁住topic和queueId，保证分配的queueOffset一致，第二个锁住所有的请求，保证commitLog单线程append有序
+     */
     public CompletableFuture<PutMessageResult> asyncPutMessage(final MessageExtBrokerInner msg) {
         // Set the storage time （设置消息存储时间）
         if (!defaultMessageStore.getMessageStoreConfig().isDuplicationEnable()) {
@@ -922,6 +925,7 @@ public class CommitLog implements Swappable {
                         onCommitLogAppend(msg, result, mappedFile);
                         break;
                     case END_OF_FILE:
+                        //到了此处，说明mappedFile文件已经放不下了，新建一个mappedFile文件放
                         onCommitLogAppend(msg, result, mappedFile);
                         unlockMappedFile = mappedFile;
                         // Create a new file, re-write the message
@@ -972,7 +976,7 @@ public class CommitLog implements Swappable {
 
         PutMessageResult putMessageResult = new PutMessageResult(PutMessageStatus.PUT_OK, result);
 
-        // Statistics
+        // Statistics（增加统计的put消息的总次数和总大小）
         storeStatsService.getSinglePutMessageTopicTimesTotal(msg.getTopic()).add(result.getMsgNum());
         storeStatsService.getSinglePutMessageTopicSizeTotal(topic).add(result.getWroteBytes());
 
