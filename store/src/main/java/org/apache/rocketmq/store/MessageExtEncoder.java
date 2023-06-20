@@ -123,7 +123,7 @@ public class MessageExtEncoder {
         this.byteBuf.writeInt(msgInner.getFlag());
         // 6 QUEUEOFFSET（队列偏移量）
         this.byteBuf.writeLong(queueOffset);
-        // 7 PHYSICALOFFSET, need update later
+        // 7 PHYSICALOFFSET(消息存储的偏移量), need update later
         this.byteBuf.writeLong(0);
         // 8 SYSFLAG
         this.byteBuf.writeInt(msgInner.getSysFlag());
@@ -141,7 +141,7 @@ public class MessageExtEncoder {
         ByteBuffer storeHostBytes = msgInner.getStoreHostBytes();
         this.byteBuf.writeBytes(storeHostBytes.array());
 
-        // 13 RECONSUMETIMES (消费次数)
+        // 13 RECONSUMETIMES (重新消费次数)
         this.byteBuf.writeInt(msgInner.getReconsumeTimes());
         // 14 Prepared Transaction Offset（预事务偏移量）
         this.byteBuf.writeLong(msgInner.getPreparedTransactionOffset());
@@ -150,10 +150,12 @@ public class MessageExtEncoder {
         if (bodyLength > 0)
             this.byteBuf.writeBytes(msgInner.getBody());
 
-        // 16 TOPIC（主体）
+        // 16 TOPIC（主题）
         if (MessageVersion.MESSAGE_VERSION_V2.equals(msgInner.getVersion())) {
+            //最大32767
             this.byteBuf.writeShort((short) topicLength);
         } else {
+            //最大127
             this.byteBuf.writeByte((byte) topicLength);
         }
         this.byteBuf.writeBytes(topicData);

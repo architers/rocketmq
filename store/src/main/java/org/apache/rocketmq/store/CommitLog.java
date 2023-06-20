@@ -892,6 +892,7 @@ public class CommitLog implements Swappable {
                 //说明校验不通过
                 return CompletableFuture.completedFuture(encodeResult);
             }
+            //将netty中的ByteBuf转为jdk的ByteBuffer
             msg.setEncodedBuff(putMessageThreadLocal.getEncoder().getEncoderBuffer());
             PutMessageContext putMessageContext = new PutMessageContext(topicQueueKey);
             //同一时刻只能一个线程putMessage
