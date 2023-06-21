@@ -26,6 +26,7 @@ public interface TransactionalMessageService {
 
     /**
      * Process prepare message, in common, we should put this message to storage service.
+     * （同步put事务消息的half消息）
      * @param messageInner Prepare(Half) message.
      * @return Prepare message storage result.
      */
@@ -33,7 +34,7 @@ public interface TransactionalMessageService {
 
     /**
      * Process prepare message in async manner, we should put this message to storage service
-     *
+     *（异步put事务消息的half消息）
      * @param messageInner Prepare(Half) message.
      * @return CompletableFuture of put result, will be completed at put success(flush and replica done)
      */
@@ -49,7 +50,7 @@ public interface TransactionalMessageService {
 
     /**
      * Invoked to process commit prepare message.
-     *
+     * 提交事务消息（将half消息赚到真正的业务topic中）
      * @param requestHeader Commit message request header.
      * @return Operate result contains prepare message and relative error code.
      */
@@ -57,7 +58,7 @@ public interface TransactionalMessageService {
 
     /**
      * Invoked to roll back prepare message.
-     *
+     * （回滚消息）
      * @param requestHeader Prepare message request header.
      * @return Operate result contains prepare message and relative error code.
      */

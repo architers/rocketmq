@@ -228,7 +228,7 @@ public class TransactionalMessageBridge {
         if (uniqId != null && !uniqId.isEmpty()) {
             MessageAccessor.putProperty(msgInner, TransactionalMessageUtil.TRANSACTION_ID, uniqId);
         }
-        //记住真的topic和queId
+        //记住真的topic和queueId
         MessageAccessor.putProperty(msgInner, MessageConst.PROPERTY_REAL_TOPIC, msgInner.getTopic());
         MessageAccessor.putProperty(msgInner, MessageConst.PROPERTY_REAL_QUEUE_ID, String.valueOf(msgInner.getQueueId()));
 
