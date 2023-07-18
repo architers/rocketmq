@@ -50,7 +50,7 @@ public interface TransactionalMessageService {
 
     /**
      * Invoked to process commit prepare message.
-     * 提交事务消息（将half消息赚到真正的业务topic中）
+     * 提交事务消息（这里其实就是从commitLog中获取half消息）
      * @param requestHeader Commit message request header.
      * @return Operate result contains prepare message and relative error code.
      */

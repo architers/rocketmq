@@ -132,11 +132,13 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
             result = this.brokerController.getTransactionalMessageService().commitMessage(requestHeader);
             if (result.getResponseCode() == ResponseCode.SUCCESS) {
                 if (rejectCommitOrRollback(requestHeader, result.getPrepareMessage())) {
+                    //超过用户check事务的时间，就不能提交
                     response.setCode(ResponseCode.ILLEGAL_OPERATION);
                     LOGGER.warn("Message commit fail [producer end]. currentTimeMillis - bornTime > checkImmunityTime, msgId={},commitLogOffset={}, wait check",
                             requestHeader.getMsgId(), requestHeader.getCommitLogOffset());
                     return response;
                 }
+                //检验half消息
                 RemotingCommand res = checkPrepareMessage(result.getPrepareMessage(), requestHeader);
                 if (res.getCode() == ResponseCode.SUCCESS) {
                     //half消息转成的真正的业务topic消息，

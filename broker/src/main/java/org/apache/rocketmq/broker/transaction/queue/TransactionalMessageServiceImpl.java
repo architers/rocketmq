@@ -113,7 +113,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
     }
 
     /**
-     * 判断事务消息出生时间是否大于FileReservedTime
+     * 判断事务消息出生时间是否大于FileReservedTime（也就是存活的时间）
      */
     private boolean needSkip(MessageExt msgExt) {
         long valueOfCurrentMinusBorn = System.currentTimeMillis() - msgExt.getBornTimestamp();
@@ -158,7 +158,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
      * <li>校验halfMessage是否已经提交或者回滚，不知道事务消息状态的消息，需要从生产者获取本地事务状态。</li>
      * <li>要想看懂这段代码，就要知道事务提交后或者回滚后，就要执行deletePrepareMessage(也就是将halfMessage的offset
      * 用逗号分隔转到opMessage的队列中，就是这种1,2,3,格式，要想校验事务已经提交，就得遍历opMessage对应的队列，
-     * 一条跟halfMessage对比判断halfMessage是否已经提交或者回滚</li>
+     * 一条条跟halfMessage对比判断halfMessage是否已经提交或者回滚)</li>
      *
      */
     @Override
@@ -176,6 +176,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
             log.debug("Check topic={}, queues={}", topic, msgQueues);
             for (MessageQueue messageQueue : msgQueues) {
                 long startTime = System.currentTimeMillis();
+                //获取事务消息的op队列
                 MessageQueue opQueue = getOpQueue(messageQueue);
                 //得到half消息的consumeOffset
                 long halfOffset = transactionalMessageBridge.fetchConsumeOffset(messageQueue);
@@ -331,7 +332,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                             //去检查本地事务的消息
                             listener.resolveHalfMsg(msgExt);
                         } else {
-                            //这个halfMessage不需要检查
+                            //这个halfMessage不需要检查，去校验下一个offset的op数据
                             nextOpOffset = pullResult != null ? pullResult.getNextBeginOffset() : nextOpOffset;
                             pullResult = fillOpRemoveMap(removeMap, opQueue, nextOpOffset,
                                     halfOffset, opMsgMap, doneOpOffset);
@@ -358,6 +359,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                 if (newOffset != halfOffset) {
                     transactionalMessageBridge.updateConsumeOffset(messageQueue, newOffset);
                 }
+                //计算op的偏移量
                 long newOpOffset = calculateOpOffset(doneOpOffset, opOffset);
                 if (newOpOffset != opOffset) {
                     transactionalMessageBridge.updateConsumeOffset(opQueue, newOpOffset);
@@ -403,7 +405,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
      */
     private PullResult fillOpRemoveMap(HashMap<Long, Long> removeMap, MessageQueue opQueue,
                                        long pullOffsetOfOp, long miniOffset, Map<Long, HashSet<Long>> opMsgMap, List<Long> doneOpOffset) {
-
+        //获取op消息
         PullResult pullResult = pullOpMsg(opQueue, pullOffsetOfOp, OP_MSG_PULL_NUMS);
         if (null == pullResult) {
             return null;
@@ -428,6 +430,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
             if (opMessageExt.getBody() == null) {
                 log.error("op message body is null. queueId={}, offset={}", opMessageExt.getQueueId(),
                         opMessageExt.getQueueOffset());
+                //op的body中，没有数据，就记住已经处理的opOffset
                 doneOpOffset.add(opMessageExt.getQueueOffset());
                 continue;
             }
@@ -441,7 +444,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                 //遍历opMessage中存贮的halfMessage
                 for (String offset : offsetArray) {
                     Long offsetValue = getLong(offset);
-                    //如果该opMessage存贮的halfMessage的offset比当前halfMessage的consumeOffset消息
+                    //如果该opMessage存贮的halfMessage的offset比当前halfMessage的consumeOffset消息小，就不管
                     if (offsetValue < miniOffset) {
                         continue;
                     }
