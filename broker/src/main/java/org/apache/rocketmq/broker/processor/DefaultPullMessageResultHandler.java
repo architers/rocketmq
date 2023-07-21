@@ -92,6 +92,7 @@ public class DefaultPullMessageResultHandler implements PullMessageResultHandler
         processor.composeResponseHeader(requestHeader, getMessageResult, topicConfig.getTopicSysFlag(),
             subscriptionGroupConfig, response, clientAddress);
         try {
+            //执行消费前的钩子函数
             processor.executeConsumeMessageHookBefore(request, requestHeader, getMessageResult, brokerAllowSuspend, response.getCode());
         } catch (AbortProcessException e) {
             response.setCode(e.getResponseCode());
@@ -101,13 +102,15 @@ public class DefaultPullMessageResultHandler implements PullMessageResultHandler
 
         //rewrite the response for the static topic
         final PullMessageResponseHeader responseHeader = (PullMessageResponseHeader) response.readCustomHeader();
+        //TODO1
         RemotingCommand rewriteResult = processor.rewriteResponseForStaticTopic(requestHeader, responseHeader, mappingContext, response.getCode());
         if (rewriteResult != null) {
             response = rewriteResult;
         }
-
+        //更新广播的拉取的offset
         processor.updateBroadcastPulledOffset(requestHeader.getTopic(), requestHeader.getConsumerGroup(),
             requestHeader.getQueueId(), requestHeader, channel, response, getMessageResult.getNextBeginOffset());
+        //尝试去提交offset
         processor.tryCommitOffset(brokerAllowSuspend, requestHeader, getMessageResult.getNextBeginOffset(),
             clientAddress);
 

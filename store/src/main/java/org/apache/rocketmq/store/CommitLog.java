@@ -958,7 +958,7 @@ public class CommitLog implements Swappable {
             } finally {
                 putMessageLock.unlock();
             }
-            // Increase queue offset when messages are successfully written
+            // Increase queue offset when messages are successfully written（消息写成功后，增加queueOffset）
             if (AppendMessageStatus.PUT_OK.equals(result.getStatus())) {
                 this.defaultMessageStore.increaseOffset(msg, getMessageNum(msg));
             }

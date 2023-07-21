@@ -158,6 +158,7 @@ public class PullRequestHoldService extends ServiceThread {
 
                         if (match) {
                             try {
+                                //执行hold住的pull请求
                                 this.brokerController.getPullMessageProcessor().executeRequestWhenWakeup(request.getClientChannel(),
                                     request.getRequestCommand());
                             } catch (Throwable e) {
@@ -168,7 +169,7 @@ public class PullRequestHoldService extends ServiceThread {
                             continue;
                         }
                     }
-
+                    //如果当前的时间大于(挂起的时间+超时时间），也执行hold住的pull请求
                     if (System.currentTimeMillis() >= (request.getSuspendTimestamp() + request.getTimeoutMillis())) {
                         try {
                             this.brokerController.getPullMessageProcessor().executeRequestWhenWakeup(request.getClientChannel(),
@@ -183,7 +184,7 @@ public class PullRequestHoldService extends ServiceThread {
 
                     replayList.add(request);
                 }
-
+                //将没有满足的数据重新添加到hold住的map之中
                 if (!replayList.isEmpty()) {
                     mpr.addPullRequest(replayList);
                 }
