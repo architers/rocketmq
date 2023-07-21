@@ -96,17 +96,8 @@ public class ScheduleMessageService extends ConfigManager {
     public ScheduleMessageService(final BrokerController brokerController) {
         this.brokerController = brokerController;
         this.enableAsyncDeliver = brokerController.getMessageStoreConfig().isEnableScheduleAsyncDeliver();
-        //刷新延迟级别消息offset时间间隔
         scheduledPersistService = new ScheduledThreadPoolExecutor(1,
-            new ThreadFactoryImpl("ScheduleMessageServicePersistThread", true, brokerController.getBrokerConfig()));
-        scheduledPersistService.scheduleAtFixedRate(() -> {
-            try {
-                //定时刷新延迟级别消息投递的offset(默认10s投递一次）
-                ScheduleMessageService.this.persist();
-            } catch (Throwable e) {
-                log.error("scheduleAtFixedRate flush exception", e);
-            }
-        }, 10000, this.brokerController.getMessageStoreConfig().getFlushDelayOffsetInterval(), TimeUnit.MILLISECONDS);
+                new ThreadFactoryImpl("ScheduleMessageServicePersistThread", true, brokerController.getBrokerConfig()));
     }
 
     public static int queueId2DelayLevel(final int queueId) {
@@ -170,15 +161,13 @@ public class ScheduleMessageService extends ConfigManager {
                 }
             }
 
-            this.deliverExecutorService.scheduleAtFixedRate(() -> {
+            scheduledPersistService.scheduleAtFixedRate(() -> {
                 try {
-                    if (started.get()) {
-                        ScheduleMessageService.this.persist();
-                    }
+                    ScheduleMessageService.this.persist();
                 } catch (Throwable e) {
                     log.error("scheduleAtFixedRate flush exception", e);
                 }
-            }, 10000, this.brokerController.getMessageStore().getMessageStoreConfig().getFlushDelayOffsetInterval(), TimeUnit.MILLISECONDS);
+            }, 10000, this.brokerController.getMessageStoreConfig().getFlushDelayOffsetInterval(), TimeUnit.MILLISECONDS);
         }
     }
 
