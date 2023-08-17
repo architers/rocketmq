@@ -2432,7 +2432,7 @@ public class DefaultMessageStore implements MessageStore {
                     minPhysicRatio = physicRatio;
                     minStorePath = storePathPhysic;
                 }
-                //超过强制清理磁盘空间使用率
+                //超过强制清理磁盘空间使用率（默认85）
                 if (physicRatio > getDiskSpaceCleanForciblyRatio()) {
                     fullStorePath.add(storePathPhysic);
                 }
@@ -2470,6 +2470,7 @@ public class DefaultMessageStore implements MessageStore {
                 cleanImmediately = true;
                 return true;
             } else if (logicsRatio > getDiskSpaceCleanForciblyRatio()) {
+                //consumeQueue的磁盘空间超过85，就立即删除
                 cleanImmediately = true;
                 return true;
             } else {
@@ -2478,7 +2479,7 @@ public class DefaultMessageStore implements MessageStore {
                     DefaultMessageStore.LOGGER.info("logics disk space OK " + logicsRatio + ", so mark disk ok");
                 }
             }
-
+            //最大磁盘使用率(默认75）
             double ratio = DefaultMessageStore.this.getMessageStoreConfig().getDiskMaxUsedSpaceRatio() / 100.0;
             int replicasPerPartition = DefaultMessageStore.this.getMessageStoreConfig().getReplicasPerDiskPartition();
             // Only one commitLog in node
