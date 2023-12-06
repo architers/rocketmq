@@ -448,7 +448,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
             }
 
             final Object objLock = messageQueueLock.fetchLockObject(this.messageQueue);
-            //synchronized保证同一时刻，只有一个线程梳理一个messageQueue的数据（messageQueue）
+            //synchronized保证同一时刻，只有一个线程梳理同一个messageQueue的数据（messageQueue）
             synchronized (objLock) {
                 //BROADCASTING模式下能消费，或者processQueue已经锁了而且锁没过期也能消费
                 if (MessageModel.BROADCASTING.equals(ConsumeMessageOrderlyService.this.defaultMQPushConsumerImpl.messageModel())
