@@ -17,11 +17,10 @@
 
 package org.apache.rocketmq.client.latency;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.rocketmq.client.ClientConfig;
 import org.apache.rocketmq.client.impl.producer.TopicPublishInfo;
+import org.apache.rocketmq.client.impl.producer.TopicPublishInfo.QueueFilter;
 import org.apache.rocketmq.common.message.MessageQueue;
-import org.apache.rocketmq.logging.org.slf4j.Logger;
-import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 
 /**
  * 故障转移策略（默认是没有开启的）
@@ -29,10 +28,59 @@ import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
  * <li>对于延迟时间为550L毫秒以下的，不可用时间都是0</li>
  */
 public class MQFaultStrategy {
-    private final static Logger log = LoggerFactory.getLogger(MQFaultStrategy.class);
-    private final LatencyFaultTolerance<String> latencyFaultTolerance = new LatencyFaultToleranceImpl();
+    private LatencyFaultTolerance<String> latencyFaultTolerance;
+    private volatile boolean sendLatencyFaultEnable;
+    private volatile boolean startDetectorEnable;
+    /**
+     * 最大延迟时间
+     */
+    private long[] latencyMax = {50L, 100L, 550L, 1800L, 3000L, 5000L, 15000L};
+    /**
+     * 不可用时间
+     */
+    private long[] notAvailableDuration = {0L, 0L, 2000L, 5000L, 6000L, 10000L, 30000L};
 
-    private boolean sendLatencyFaultEnable = false;
+    public static class BrokerFilter implements QueueFilter {
+        private String lastBrokerName;
+
+        public void setLastBrokerName(String lastBrokerName) {
+            this.lastBrokerName = lastBrokerName;
+        }
+
+        @Override public boolean filter(MessageQueue mq) {
+            if (lastBrokerName != null) {
+                return !mq.getBrokerName().equals(lastBrokerName);
+            }
+            return true;
+        }
+    }
+
+    private ThreadLocal<BrokerFilter> threadBrokerFilter = new ThreadLocal<BrokerFilter>() {
+        @Override protected BrokerFilter initialValue() {
+            return new BrokerFilter();
+        }
+    };
+
+    private QueueFilter reachableFilter = new QueueFilter() {
+        @Override public boolean filter(MessageQueue mq) {
+            return latencyFaultTolerance.isReachable(mq.getBrokerName());
+        }
+    };
+
+    private QueueFilter availableFilter = new QueueFilter() {
+        @Override public boolean filter(MessageQueue mq) {
+            return latencyFaultTolerance.isAvailable(mq.getBrokerName());
+        }
+    };
+
+
+    public MQFaultStrategy(ClientConfig cc, Resolver fetcher, ServiceDetector serviceDetector) {
+        this.latencyFaultTolerance = new LatencyFaultToleranceImpl(fetcher, serviceDetector);
+        this.latencyFaultTolerance.setDetectInterval(cc.getDetectInterval());
+        this.latencyFaultTolerance.setDetectTimeout(cc.getDetectTimeout());
+        this.setStartDetectorEnable(cc.isStartDetectorEnable());
+        this.setSendLatencyFaultEnable(cc.isSendLatencyEnable());
+    }
 
     /**
      * 最大延迟时间
@@ -42,9 +90,30 @@ public class MQFaultStrategy {
      * 不可用时间
      */
     private long[] notAvailableDuration = {0L, 0L, 30000L, 60000L, 120000L, 180000L, 600000L};
+    // For unit test.
+    public MQFaultStrategy(ClientConfig cc, LatencyFaultTolerance<String> tolerance) {
+        this.setStartDetectorEnable(cc.isStartDetectorEnable());
+        this.setSendLatencyFaultEnable(cc.isSendLatencyEnable());
+        this.latencyFaultTolerance = tolerance;
+        this.latencyFaultTolerance.setDetectInterval(cc.getDetectInterval());
+        this.latencyFaultTolerance.setDetectTimeout(cc.getDetectTimeout());
+    }
+
 
     public long[] getNotAvailableDuration() {
         return notAvailableDuration;
+    }
+
+    public QueueFilter getAvailableFilter() {
+        return availableFilter;
+    }
+
+    public QueueFilter getReachableFilter() {
+        return reachableFilter;
+    }
+
+    public ThreadLocal<BrokerFilter> getThreadBrokerFilter() {
+        return threadBrokerFilter;
     }
 
     public void setNotAvailableDuration(final long[] notAvailableDuration) {
@@ -67,53 +136,49 @@ public class MQFaultStrategy {
         this.sendLatencyFaultEnable = sendLatencyFaultEnable;
     }
 
-    public MessageQueue selectOneMessageQueue(final TopicPublishInfo tpInfo, final String lastBrokerName) {
-        if (this.sendLatencyFaultEnable) {
-            try {
-                //遍历topic路由信息中所有的messageQueue，采用轮训的方式，可用就返回
-                int index = tpInfo.getSendWhichQueue().incrementAndGet();
-                for (int i = 0; i < tpInfo.getMessageQueueList().size(); i++) {
-                    int pos = index++ % tpInfo.getMessageQueueList().size();
-                    MessageQueue mq = tpInfo.getMessageQueueList().get(pos);
-                    if (!StringUtils.equals(lastBrokerName, mq.getBrokerName()) && latencyFaultTolerance.isAvailable(mq.getBrokerName())) {
-                        return mq;
-                    }
-                }
-                /*
-                 *到这里说明，说明所有的broker都不可用，接下来：
-                 * 1.选择其中broker（pickOneAtLeast方法中会选取相对可用的broker）
-                 * 2.然后从broker获取当前topic写队列数据数量
-                 * 3.再轮训负载，选一个messageQueue
-                 */
-                final String notBestBroker = latencyFaultTolerance.pickOneAtLeast();
-                int writeQueueNums = tpInfo.getWriteQueueIdByBroker(notBestBroker);
-                if (writeQueueNums > 0) {
-                    final MessageQueue mq = tpInfo.selectOneMessageQueue();
-                    if (notBestBroker != null) {
-                        mq.setBrokerName(notBestBroker);
-                        //防止不同broker的writeQueue不同，就对QueueId重新负载
-                        mq.setQueueId(tpInfo.getSendWhichQueue().incrementAndGet() % writeQueueNums);
-                    }
-                    return mq;
-                } else {
-                    //说明这个broker中，该topic根本不能写数据，就从latencyFaultTolerance中移除这个broker,
-                    // 一定时刻pickOneAtLeast就不会有他了，但是
-                    latencyFaultTolerance.remove(notBestBroker);
-                }
-            } catch (Exception e) {
-                log.error("Error occurred when selecting message queue", e);
-            }
-            /*
-             *  上边两个步骤，还没有得到合适的broker,只能在所有的messageQueue中轮训选择了，造成的情况：
-             * 1.pickOneAtLeast的broker中，该topic中writeQueueNums<=0
-             * 2.上述故障转移选择messageQueue的过程中出现异常，直接用selectOneMessageQueue兜底
-             */
-            return tpInfo.selectOneMessageQueue();
-        }
-        //没有开启故障转移，就直接轮训选择一个
-        return tpInfo.selectOneMessageQueue(lastBrokerName);
+    public boolean isStartDetectorEnable() {
+        return startDetectorEnable;
     }
 
+    public void setStartDetectorEnable(boolean startDetectorEnable) {
+        this.startDetectorEnable = startDetectorEnable;
+        this.latencyFaultTolerance.setStartDetectorEnable(startDetectorEnable);
+    }
+
+    public void startDetector() {
+        this.latencyFaultTolerance.startDetector();
+    }
+
+    public void shutdown() {
+        this.latencyFaultTolerance.shutdown();
+    }
+
+    public MessageQueue selectOneMessageQueue(final TopicPublishInfo tpInfo, final String lastBrokerName, final boolean resetIndex) {
+        BrokerFilter brokerFilter = threadBrokerFilter.get();
+        brokerFilter.setLastBrokerName(lastBrokerName);
+        if (this.sendLatencyFaultEnable) {
+            if (resetIndex) {
+                tpInfo.resetIndex();
+            }
+            MessageQueue mq = tpInfo.selectOneMessageQueue(availableFilter, brokerFilter);
+            if (mq != null) {
+                return mq;
+            }
+
+            mq = tpInfo.selectOneMessageQueue(reachableFilter, brokerFilter);
+            if (mq != null) {
+                return mq;
+            }
+
+            return tpInfo.selectOneMessageQueue();
+        }
+
+        MessageQueue mq = tpInfo.selectOneMessageQueue(brokerFilter);
+        if (mq != null) {
+            return mq;
+        }
+        return tpInfo.selectOneMessageQueue();
+    }
     /**
      * 更新故障项
      * <li>如果开启了故障转移，在当前类selectOneMessageQueue方法中，就会判断当前messageQueue可用</li>
@@ -122,12 +187,13 @@ public class MQFaultStrategy {
      * @param currentLatency 当前延迟时间
      * @param isolation      是否隔离（true的时候，计算延迟时间为30秒，也就说明broker30秒不可用）
      */
-    public void updateFaultItem(final String brokerName, final long currentLatency, boolean isolation) {
+    public void updateFaultItem(final String brokerName, final long currentLatency, boolean isolation,
+                                final boolean reachable) {
         //发送延迟故障启用(默认为false)
         if (this.sendLatencyFaultEnable) {
-            long duration = computeNotAvailableDuration(isolation ? 30000 : currentLatency);
+            long duration = computeNotAvailableDuration(isolation ? 10000 : currentLatency);
             //更新故障项
-            this.latencyFaultTolerance.updateFaultItem(brokerName, currentLatency, duration);
+            this.latencyFaultTolerance.updateFaultItem(brokerName, currentLatency, duration, reachable);
         }
     }
 
@@ -136,8 +202,9 @@ public class MQFaultStrategy {
      */
     private long computeNotAvailableDuration(final long currentLatency) {
         for (int i = latencyMax.length - 1; i >= 0; i--) {
-            if (currentLatency >= latencyMax[i])
+            if (currentLatency >= latencyMax[i]) {
                 return this.notAvailableDuration[i];
+            }
         }
 
         return 0;

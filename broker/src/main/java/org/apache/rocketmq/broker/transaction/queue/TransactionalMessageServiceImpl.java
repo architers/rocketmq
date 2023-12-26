@@ -685,7 +685,9 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
 
     @Override
     public void close() {
-
+        if (this.transactionalOpBatchService != null) {
+            this.transactionalOpBatchService.shutdown();
+        }
     }
 
     public Message getOpMessage(int queueId, String moreData) {

@@ -14,38 +14,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.rocketmq.tieredstore.common;
+package org.apache.rocketmq.tieredstore.provider;
 
-/**
- *  This enumeration represents the boundary types.
- *  It has two constants, lower and upper, which represent the lower and upper boundaries respectively.
- */
-public enum BoundaryType {
+import org.apache.rocketmq.common.topic.TopicValidator;
+import org.junit.Assert;
+import org.junit.Test;
 
-    /**
-     * Represents the lower boundary.
-     */
-    LOWER("lower"),
+public class TieredStoreTopicBlackListFilterTest {
 
-    /**
-     * Represents the upper boundary.
-     */
-    UPPER("upper");
+    @Test
+    public void filterTopicTest() {
+        TieredStoreTopicFilter topicFilter = new TieredStoreTopicBlackListFilter();
+        Assert.assertTrue(topicFilter.filterTopic(""));
+        Assert.assertTrue(topicFilter.filterTopic(TopicValidator.SYSTEM_TOPIC_PREFIX + "_Topic"));
 
-    private final String name;
-
-    BoundaryType(String name) {
-        this.name = name;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public static BoundaryType getType(String name) {
-        if (BoundaryType.UPPER.getName().equalsIgnoreCase(name)) {
-            return UPPER;
-        }
-        return LOWER;
+        String topicName = "WhiteTopic";
+        Assert.assertFalse(topicFilter.filterTopic(topicName));
+        topicFilter.addTopicToWhiteList(topicName);
+        Assert.assertTrue(topicFilter.filterTopic(topicName));
     }
 }

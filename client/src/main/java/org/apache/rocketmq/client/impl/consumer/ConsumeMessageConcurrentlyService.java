@@ -480,6 +480,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
             if (ConsumeMessageConcurrentlyService.this.defaultMQPushConsumerImpl.hasHook()) {
                 consumeMessageContext.setStatus(status.toString());
                 consumeMessageContext.setSuccess(ConsumeConcurrentlyStatus.CONSUME_SUCCESS == status);
+                consumeMessageContext.setAccessChannel(defaultMQPushConsumer.getAccessChannel());
                 //执行消费后的钩子函数
                 ConsumeMessageConcurrentlyService.this.defaultMQPushConsumerImpl.executeHookAfter(consumeMessageContext);
             }

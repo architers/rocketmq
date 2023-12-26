@@ -16,7 +16,6 @@
  */
 package org.apache.rocketmq.broker.offset;
 
-import com.google.common.base.Strings;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -26,6 +25,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
+
+import com.google.common.base.Strings;
+
 import org.apache.rocketmq.broker.BrokerController;
 import org.apache.rocketmq.broker.BrokerPathConfigHelper;
 import org.apache.rocketmq.common.ConfigManager;
@@ -40,14 +42,13 @@ import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
  * 消费偏移量管理
  */
 public class ConsumerOffsetManager extends ConfigManager {
-    private static final Logger LOG = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
+    protected static final Logger LOG = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     public static final String TOPIC_GROUP_SEPARATOR = "@";
 
     private DataVersion dataVersion = new DataVersion();
 
-    private ConcurrentMap<String/* topic@consumegroup */, ConcurrentMap<Integer/*queueId*/, Long
-            /*消费偏移量*/>>
-    offsetTable = new ConcurrentHashMap<>(512);
+    protected ConcurrentMap<String/* topic@group */, ConcurrentMap<Integer, Long>> offsetTable =
+        new ConcurrentHashMap<>(512);
 
     private final ConcurrentMap<String, ConcurrentMap<Integer, Long>> resetOffsetTable =
         new ConcurrentHashMap<>(512);
@@ -66,6 +67,10 @@ public class ConsumerOffsetManager extends ConfigManager {
         this.brokerController = brokerController;
     }
 
+    protected void removeConsumerOffset(String topicAtGroup) {
+
+    }
+
     public void cleanOffset(String group) {
         Iterator<Entry<String, ConcurrentMap<Integer, Long>>> it = this.offsetTable.entrySet().iterator();
         while (it.hasNext()) {
@@ -75,6 +80,7 @@ public class ConsumerOffsetManager extends ConfigManager {
                 String[] arrays = topicAtGroup.split(TOPIC_GROUP_SEPARATOR);
                 if (arrays.length == 2 && group.equals(arrays[1])) {
                     it.remove();
+                    removeConsumerOffset(topicAtGroup);
                     LOG.warn("Clean group's offset, {}, {}", topicAtGroup, next.getValue());
                 }
             }
@@ -93,6 +99,7 @@ public class ConsumerOffsetManager extends ConfigManager {
                 String[] arrays = topicAtGroup.split(TOPIC_GROUP_SEPARATOR);
                 if (arrays.length == 2 && topic.equals(arrays[0])) {
                     it.remove();
+                    removeConsumerOffset(topicAtGroup);
                     LOG.warn("Clean topic's offset, {}, {}", topicAtGroup, next.getValue());
                 }
             }
@@ -112,6 +119,7 @@ public class ConsumerOffsetManager extends ConfigManager {
                 if (null == brokerController.getConsumerManager().findSubscriptionData(group, topic)
                     && this.offsetBehindMuchThanData(topic, next.getValue())) {
                     it.remove();
+                    removeConsumerOffset(topicAtGroup);
                     LOG.warn("remove topic offset, {}", topicAtGroup);
                 }
             }
@@ -328,8 +336,10 @@ public class ConsumerOffsetManager extends ConfigManager {
             for (String group : filterGroups.split(",")) {
                 Iterator<String> it = topicGroups.iterator();
                 while (it.hasNext()) {
-                    if (group.equals(it.next().split(TOPIC_GROUP_SEPARATOR)[1])) {
+                    String topicAtGroup = it.next();
+                    if (group.equals(topicAtGroup.split(TOPIC_GROUP_SEPARATOR)[1])) {
                         it.remove();
+                        removeConsumerOffset(topicAtGroup);
                     }
                 }
             }
@@ -386,6 +396,7 @@ public class ConsumerOffsetManager extends ConfigManager {
                 String[] arrays = topicAtGroup.split(TOPIC_GROUP_SEPARATOR);
                 if (arrays.length == 2 && group.equals(arrays[1])) {
                     it.remove();
+                    removeConsumerOffset(topicAtGroup);
                     LOG.warn("clean group offset {}", topicAtGroup);
                 }
             }
