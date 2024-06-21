@@ -73,6 +73,7 @@ public class ProcessQueue {
      * @param pushConsumer
      */
     public void cleanExpiredMsg(DefaultMQPushConsumer pushConsumer) {
+        ////顺序消费不清理消息
         if (pushConsumer.isConsumeOrderly()) {
             return;
         }
@@ -84,6 +85,7 @@ public class ProcessQueue {
                 this.treeMapLock.readLock().lockInterruptibly();
                 try {
                     if (!msgTreeMap.isEmpty()) {
+                        //当前时间-第一条消息的消费的开始消费时间>大于消费超时时间（默认15分钟）,就将第一条消息赋值给msg
                         String consumeStartTimeStamp = MessageAccessor.getConsumeStartTimeStamp(msgTreeMap.firstEntry().getValue());
                         if (StringUtils.isNotEmpty(consumeStartTimeStamp) && System.currentTimeMillis() - Long.parseLong(consumeStartTimeStamp) > pushConsumer.getConsumeTimeout() * 60 * 1000) {
                             msg = msgTreeMap.firstEntry().getValue();
@@ -97,6 +99,7 @@ public class ProcessQueue {
             }
 
             if (msg == null) {
+                //没有消息
                 break;
             }
 
@@ -107,6 +110,7 @@ public class ProcessQueue {
                 try {
                     this.treeMapLock.writeLock().lockInterruptibly();
                     try {
+                        //如果第一条消息还是msg,就移除这个消息
                         if (!msgTreeMap.isEmpty() && msg.getQueueOffset() == msgTreeMap.firstKey()) {
                             try {
                                 removeMessage(Collections.singletonList(msg));
@@ -167,6 +171,9 @@ public class ProcessQueue {
         return dispatchToConsume;
     }
 
+    /**
+     * 得到消息的offset最大跨度
+     */
     public long getMaxSpan() {
         try {
             this.treeMapLock.readLock().lockInterruptibly();
@@ -195,6 +202,7 @@ public class ProcessQueue {
                     result = this.queueOffsetMax + 1;
                     int removedCnt = 0;
                     for (MessageExt msg : msgs) {
+                        //移除已经消费成功的消息
                         MessageExt prev = msgTreeMap.remove(msg.getQueueOffset());
                         if (prev != null) {
                             removedCnt--;
@@ -287,6 +295,9 @@ public class ProcessQueue {
         return -1;
     }
 
+    /**
+     * 让消息再消费一次
+     */
     public void makeMessageToConsumeAgain(List<MessageExt> msgs) {
         try {
             this.treeMapLock.writeLock().lockInterruptibly();
@@ -303,6 +314,9 @@ public class ProcessQueue {
         }
     }
 
+    /**
+     * 从msgTreeMap中获取batchSize条消息
+     */
     public List<MessageExt> takeMessages(final int batchSize) {
         List<MessageExt> result = new ArrayList<>(batchSize);
         final long now = System.currentTimeMillis();
@@ -337,6 +351,7 @@ public class ProcessQueue {
 
     /**
      * Return the result that whether current message is exist in the process queue or not.
+     * 判断processQueue中是否包含某条消息
      */
     public boolean containsMessage(MessageExt message) {
         if (message == null) {

@@ -43,6 +43,7 @@ public class TransactionalMessageCheckService extends ServiceThread {
     public void run() {
         log.info("Start transaction check service thread!");
         while (!this.isStopped()) {
+            //默认30秒校验一次
             long checkInterval = brokerController.getBrokerConfig().getTransactionCheckInterval();
             this.waitForRunning(checkInterval);
         }
@@ -51,7 +52,9 @@ public class TransactionalMessageCheckService extends ServiceThread {
 
     @Override
     protected void onWaitEnd() {
+        //默认6s
         long timeout = brokerController.getBrokerConfig().getTransactionTimeOut();
+        //默认情况一个事务消息最多校验15次
         int checkMax = brokerController.getBrokerConfig().getTransactionCheckMax();
         long begin = System.currentTimeMillis();
         log.info("Begin to check prepare message, begin time:{}", begin);

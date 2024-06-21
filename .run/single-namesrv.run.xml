@@ -1,0 +1,17 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="single-namesrv" type="Application" factoryName="Application" folderName="single">
+    <option name="MAIN_CLASS_NAME" value="org.apache.rocketmq.namesrv.NamesrvStartup" />
+    <module name="rocketmq-namesrv" />
+    <option name="PROGRAM_PARAMETERS" value="-c conf/single/namesrv.conf" />
+    <option name="VM_PARAMETERS" value="-Xmx350m" />
+    <extension name="coverage">
+      <pattern>
+        <option name="PATTERN" value="org.apache.rocketmq.namesrv.*" />
+        <option name="ENABLED" value="true" />
+      </pattern>
+    </extension>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

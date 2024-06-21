@@ -188,7 +188,7 @@ public class TopicQueueMappingManager extends ConfigManager {
 
     //Do not return a null context
     public TopicQueueMappingContext buildTopicQueueMappingContext(TopicRequestHeader requestHeader, boolean selectOneWhenMiss) {
-        // if lo is set to false explicitly, it maybe the forwarded request
+        // if lo is set to false explicitly, it maybe the forwarded request（如果 lo 显式设置为 false，则可能是转发的请求）
         if (requestHeader.getLo() != null
                 && Boolean.FALSE.equals(requestHeader.getLo())) {
             return new TopicQueueMappingContext(requestHeader.getTopic(), null, null, null, null);

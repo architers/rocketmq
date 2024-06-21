@@ -335,6 +335,9 @@ public class MQClientAPIImpl implements NameServerUpdateCallback {
         this.remotingClient.shutdown();
     }
 
+    /**
+     *查询topic的队列分配
+     */
     public Set<MessageQueueAssignment> queryAssignment(final String addr, final String topic,
         final String consumerGroup, final String clientId, final String strategyName,
         final MessageModel messageModel, final long timeoutMillis)
@@ -555,6 +558,7 @@ public class MQClientAPIImpl implements NameServerUpdateCallback {
         String msgType = msg.getProperty(MessageConst.PROPERTY_MESSAGE_TYPE);
         boolean isReply = msgType != null && msgType.equals(MixAll.REPLY_MESSAGE_FLAG);
         if (isReply) {
+            //sendSmartMsg默认为true
             if (sendSmartMsg) {
                 SendMessageRequestHeaderV2 requestHeaderV2 = SendMessageRequestHeaderV2.createSendMessageRequestHeaderV2(requestHeader);
                 request = RemotingCommand.createRequestCommand(RequestCode.SEND_REPLY_MESSAGE_V2, requestHeaderV2);
@@ -573,9 +577,11 @@ public class MQClientAPIImpl implements NameServerUpdateCallback {
 
         switch (communicationMode) {
             case ONEWAY:
+                //oneway不管消息结果
                 this.remotingClient.invokeOneway(addr, request, timeoutMillis);
                 return null;
             case ASYNC:
+                //异步消息，通过sendCallback返回结果
                 final AtomicInteger times = new AtomicInteger();
                 long costTimeAsync = System.currentTimeMillis() - beginStartTime;
                 if (timeoutMillis < costTimeAsync) {
@@ -587,6 +593,7 @@ public class MQClientAPIImpl implements NameServerUpdateCallback {
             case SYNC:
                 long costTimeSync = System.currentTimeMillis() - beginStartTime;
                 if (timeoutMillis < costTimeSync) {
+                    //再次判断超时时间
                     throw new RemotingTooMuchRequestException("sendMessage call timeout");
                 }
                 return this.sendMessageSync(addr, brokerName, msg, timeoutMillis - costTimeSync, request);
@@ -754,14 +761,17 @@ public class MQClientAPIImpl implements NameServerUpdateCallback {
     ) throws MQBrokerException, RemotingCommandException {
         SendStatus sendStatus;
         switch (response.getCode()) {
+            //刷新磁盘超时
             case ResponseCode.FLUSH_DISK_TIMEOUT: {
                 sendStatus = SendStatus.FLUSH_DISK_TIMEOUT;
                 break;
             }
+            //刷新到从库超时
             case ResponseCode.FLUSH_SLAVE_TIMEOUT: {
                 sendStatus = SendStatus.FLUSH_SLAVE_TIMEOUT;
                 break;
             }
+            //从节点不可用
             case ResponseCode.SLAVE_NOT_AVAILABLE: {
                 sendStatus = SendStatus.SLAVE_NOT_AVAILABLE;
                 break;
@@ -966,7 +976,10 @@ public class MQClientAPIImpl implements NameServerUpdateCallback {
         });
     }
 
-    public void changeInvisibleTimeAsync(//
+    /**
+     * 异步改变不可见时间
+     */
+    public void changeInvisibleTimeAsync(
         final String brokerName,
         final String addr, //
         final ChangeInvisibleTimeRequestHeader requestHeader,//

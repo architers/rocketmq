@@ -59,12 +59,17 @@ public class SlaveSynchronize {
     }
 
     public void syncAll() {
+        //同步topic配置
         this.syncTopicConfig();
+        //同步consumerOffset
         this.syncConsumerOffset();
+        //同步延迟级别的offset
         this.syncDelayOffset();
+        //同步订阅组配置
         this.syncSubscriptionGroupConfig();
+        //同步消息请求模式（pull还是poll)
         this.syncMessageRequestMode();
-
+        //同步时间轮信息
         if (brokerController.getMessageStoreConfig().isTimerWheelEnable()) {
             this.syncTimerMetrics();
         }

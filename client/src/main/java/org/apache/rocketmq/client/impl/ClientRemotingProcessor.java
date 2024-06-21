@@ -72,6 +72,7 @@ public class ClientRemotingProcessor implements NettyRequestProcessor {
             case RequestCode.CHECK_TRANSACTION_STATE:
                 return this.checkTransactionState(ctx, request);
             case RequestCode.NOTIFY_CONSUMER_IDS_CHANGED:
+                //通知消费者ID发生改变
                 return this.notifyConsumerIdsChanged(ctx, request);
             case RequestCode.RESET_CONSUMER_CLIENT_OFFSET:
                 return this.resetOffset(ctx, request);
@@ -80,7 +81,7 @@ public class ClientRemotingProcessor implements NettyRequestProcessor {
 
             case RequestCode.GET_CONSUMER_RUNNING_INFO:
                 return this.getConsumerRunningInfo(ctx, request);
-
+            //直接消费消息
             case RequestCode.CONSUME_MESSAGE_DIRECTLY:
                 return this.consumeMessageDirectly(ctx, request);
 
@@ -139,6 +140,7 @@ public class ClientRemotingProcessor implements NettyRequestProcessor {
             logger.info("receive broker's notification[{}], the consumer group: {} changed, rebalance immediately",
                 RemotingHelper.parseChannelRemoteAddr(ctx.channel()),
                 requestHeader.getConsumerGroup());
+            //当消费者ID改变的时候，立即重负载
             this.mqClientFactory.rebalanceImmediately();
         } catch (Exception e) {
             logger.error("notifyConsumerIdsChanged exception", UtilAll.exceptionSimpleDesc(e));

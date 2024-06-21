@@ -31,6 +31,11 @@ import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 import org.apache.rocketmq.remoting.protocol.heartbeat.SubscriptionData;
 
+/**
+ * 消费ID改变监听器
+ * <li>通知消费者consumeId改变，重负载</li>
+ * <li>同时管理ConsumerFilter的数据</li>
+ */
 public class DefaultConsumerIdsChangeListener implements ConsumerIdsChangeListener {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private final BrokerController brokerController;
@@ -43,7 +48,7 @@ public class DefaultConsumerIdsChangeListener implements ConsumerIdsChangeListen
 
     public DefaultConsumerIdsChangeListener(BrokerController brokerController) {
         this.brokerController = brokerController;
-
+        //每15秒通知消费者ID改变
         scheduledExecutorService.scheduleAtFixedRate(new AbstractBrokerRunnable(brokerController.getBrokerConfig()) {
             @Override
             public void run0() {
@@ -63,6 +68,7 @@ public class DefaultConsumerIdsChangeListener implements ConsumerIdsChangeListen
             return;
         }
         switch (event) {
+            //改变
             case CHANGE:
                 if (args == null || args.length < 1) {
                     return;
@@ -78,6 +84,7 @@ public class DefaultConsumerIdsChangeListener implements ConsumerIdsChangeListen
                     }
                 }
                 break;
+                //取消注册
             case UNREGISTER:
                 this.brokerController.getConsumerFilterManager().unRegister(group);
                 break;

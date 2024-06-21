@@ -21,17 +21,33 @@ import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 import org.apache.rocketmq.store.MessageStore;
 
+/**
+ * broker统计（大维度）
+ * <li>每天凌晨0点执行(也就是12点执行），记录累计到前天、昨天的生产以及消费消息的总数。</li>
+ */
 public class BrokerStats {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
 
     private final MessageStore defaultMessageStore;
 
+    /**
+     * 累计到昨天早上put消息数量
+     */
     private volatile long msgPutTotalYesterdayMorning;
 
+    /**
+     * 累计到今天早上消息put的数量
+     */
     private volatile long msgPutTotalTodayMorning;
 
+    /**
+     * 累计到昨天早上get消息数量（也就是到前天晚上累计get消息的总数量）
+     */
     private volatile long msgGetTotalYesterdayMorning;
 
+    /**
+     * 累计到今天早上消息put的数量(也就是到昨晚累计get消息的数量）
+     */
     private volatile long msgGetTotalTodayMorning;
 
     public BrokerStats(MessageStore defaultMessageStore) {
@@ -39,6 +55,7 @@ public class BrokerStats {
     }
 
     public void record() {
+        //12点执行，新的一天，累计到前天的数据=昨天累计的数据
         this.msgPutTotalYesterdayMorning = this.msgPutTotalTodayMorning;
         this.msgGetTotalYesterdayMorning = this.msgGetTotalTodayMorning;
 

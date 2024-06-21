@@ -62,6 +62,11 @@ import static org.apache.rocketmq.broker.metrics.BrokerMetricsConstant.LABEL_IS_
 import static org.apache.rocketmq.broker.metrics.BrokerMetricsConstant.LABEL_MESSAGE_TYPE;
 import static org.apache.rocketmq.broker.metrics.BrokerMetricsConstant.LABEL_TOPIC;
 
+/**
+ * 延迟级别的定时消息service
+ * <li>每个延迟级别的都有一个定时任务</li>
+ * <li>如果要求延迟级别投递消息的延迟时间更准确，我们可以开启enableAsyncDeliver去异步投递消息</li>
+ */
 public class ScheduleMessageService extends ConfigManager {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
 
@@ -148,8 +153,10 @@ public class ScheduleMessageService extends ConfigManager {
 
                 if (timeDelay != null) {
                     if (this.enableAsyncDeliver) {
+                        //开启处理异步投递的定时任务(延迟时间为延迟级别)，定时处理投递结果
                         this.handleExecutorService.schedule(new HandlePutResultTask(level), FIRST_DELAY_TIME, TimeUnit.MILLISECONDS);
                     }
+                    //投递延迟级别的消息的定时任务
                     this.deliverExecutorService.schedule(new DeliverDelayedMessageTimerTask(level, offset), FIRST_DELAY_TIME, TimeUnit.MILLISECONDS);
                 }
             }
@@ -219,18 +226,24 @@ public class ScheduleMessageService extends ConfigManager {
 
     @Override
     public boolean load() {
+        //加载配置文件中的数据（delayOffset.json）
         boolean result = super.load();
+        //解析延迟级别
         result = result && this.parseDelayLevel();
+        //纠正延迟级别消息的偏移量
         result = result && this.correctDelayOffset();
         return result;
     }
-    
+
     public boolean loadWhenSyncDelayOffset() {
         boolean result = super.load();
         result = result && this.parseDelayLevel();
         return result;
     }
 
+    /**
+     * 纠正延迟级别消息的消费偏移量
+     */
     public boolean correctDelayOffset() {
         try {
             for (int delayLevel : delayLevelTable.keySet()) {
@@ -244,12 +257,13 @@ public class ScheduleMessageService extends ConfigManager {
                 long correctDelayOffset = currentDelayOffset;
                 long cqMinOffset = cq.getMinOffsetInQueue();
                 long cqMaxOffset = cq.getMaxOffsetInQueue();
+                //太小，就设置为最小的偏移量
                 if (currentDelayOffset < cqMinOffset) {
                     correctDelayOffset = cqMinOffset;
                     log.error("schedule CQ offset invalid. offset={}, cqMinOffset={}, cqMaxOffset={}, queueId={}",
                         currentDelayOffset, cqMinOffset, cqMaxOffset, cq.getQueueId());
                 }
-
+                //太大，correctDelayOffset设置为最大偏移量
                 if (currentDelayOffset > cqMaxOffset) {
                     correctDelayOffset = cqMaxOffset;
                     log.error("schedule CQ offset invalid. offset={}, cqMinOffset={}, cqMaxOffset={}, queueId={}",
@@ -296,6 +310,9 @@ public class ScheduleMessageService extends ConfigManager {
         return delayOffsetSerializeWrapper.toJson(prettyFormat);
     }
 
+    /**
+     * 解析延迟级别，都将延迟级别转换为秒
+     */
     public boolean parseDelayLevel() {
         HashMap<String, Long> timeUnitTable = new HashMap<>();
         timeUnitTable.put("s", 1000L);
@@ -402,6 +419,7 @@ public class ScheduleMessageService extends ConfigManager {
                     delayLevel2QueueId(delayLevel));
 
             if (cq == null) {
+                //说明没cq为空，就添加下一次定时任务
                 this.scheduleNextTimerTask(this.offset, DELAY_FOR_A_WHILE);
                 return;
             }
@@ -467,6 +485,7 @@ public class ScheduleMessageService extends ConfigManager {
 
                     boolean deliverSuc;
                     if (ScheduleMessageService.this.enableAsyncDeliver) {
+                        //异步投递消息到真的topic
                         deliverSuc = this.asyncDeliver(msgInner, msgExt.getMsgId(), currOffset, offsetPy, sizePy);
                     } else {
                         deliverSuc = this.syncDeliver(msgInner, msgExt.getMsgId(), currOffset, offsetPy, sizePy);
@@ -497,6 +516,7 @@ public class ScheduleMessageService extends ConfigManager {
             PutMessageResult result = resultProcess.get();
             boolean sendStatus = result != null && result.getPutMessageStatus() == PutMessageStatus.PUT_OK;
             if (sendStatus) {
+                //更新延迟级别消息的传递的偏移量
                 ScheduleMessageService.this.updateOffset(this.delayLevel, resultProcess.getNextOffset());
             }
             return sendStatus;
@@ -510,6 +530,7 @@ public class ScheduleMessageService extends ConfigManager {
             int currentPendingNum = processesQueue.size();
             int maxPendingLimit = brokerController.getMessageStoreConfig()
                 .getScheduleAsyncDeliverMaxPendingLimit();
+            //异步投递任务太多，超过限制
             if (currentPendingNum > maxPendingLimit) {
                 log.warn("Asynchronous deliver triggers flow control, " +
                     "currentPendingNum={}, maxPendingLimit={}", currentPendingNum, maxPendingLimit);

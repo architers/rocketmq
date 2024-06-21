@@ -22,6 +22,11 @@ import org.apache.rocketmq.client.impl.producer.TopicPublishInfo;
 import org.apache.rocketmq.client.impl.producer.TopicPublishInfo.QueueFilter;
 import org.apache.rocketmq.common.message.MessageQueue;
 
+/**
+ * 故障转移策略（默认是没有开启的）
+ * <li>broker不可用的时间就是根据latencyMax判断的，大于哪个下标，然后就从notAvailableDuration取不可用时间。</li>
+ * <li>对于延迟时间为550L毫秒以下的，不可用时间都是0</li>
+ */
 public class MQFaultStrategy {
     private LatencyFaultTolerance<String> latencyFaultTolerance;
     private volatile boolean sendLatencyFaultEnable;
@@ -161,14 +166,26 @@ public class MQFaultStrategy {
         return tpInfo.selectOneMessageQueue();
     }
 
+    /**
+     * 更新故障项
+     * <li>如果开启了故障转移，在当前类selectOneMessageQueue方法中，就会判断当前messageQueue可用</li>
+     *
+     * @param brokerName     broker名称
+     * @param currentLatency 当前延迟时间
+     * @param isolation      是否隔离（true的时候，计算延迟时间为30秒，也就说明broker30秒不可用）
+     */
     public void updateFaultItem(final String brokerName, final long currentLatency, boolean isolation,
                                 final boolean reachable) {
+        // //发送延迟故障启用(默认为false)
         if (this.sendLatencyFaultEnable) {
             long duration = computeNotAvailableDuration(isolation ? 10000 : currentLatency);
             this.latencyFaultTolerance.updateFaultItem(brokerName, currentLatency, duration, reachable);
         }
     }
 
+    /**
+     * 计算不可用持续时间：据currentLatency判断在latencyMax哪个时间段，从而从notAvailableDuration得到不可用时间
+     */
     private long computeNotAvailableDuration(final long currentLatency) {
         for (int i = latencyMax.length - 1; i >= 0; i--) {
             if (currentLatency >= latencyMax[i]) {

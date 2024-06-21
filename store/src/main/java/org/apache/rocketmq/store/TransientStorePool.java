@@ -27,11 +27,23 @@ import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 import org.apache.rocketmq.store.util.LibC;
 import sun.nio.ch.DirectBuffer;
 
+/**
+ * 瞬态存储池（直接内存存储池）
+ * Java NIO 的内存映射机制，提供了将文件系统中的文件映射到内存机制，实现对文件的操作转换对内存地址的操作，极大的提高了 IO 特性，
+ * 但这部分内存并不是常驻内存，可以被置换到交换内存
+ * (虚拟内存)，RocketMQ 为了提高消息发送的性能，引入了内存锁定机制，即将最近需要操作的 commitlog 文件映射到内存，并提供内存锁定功能，确保这些文件始终存在内存中，该机制的控制参数就是 transientStorePoolEnable
+ * <li>如果开启，会分配直接内存（默认5个commitLog文件大小），让消息写入直接内存中</li>
+ *
+ *
+ */
 public class TransientStorePool {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
 
     private final int poolSize;
     private final int fileSize;
+    /**
+     * 可用缓冲区
+     */
     private final Deque<ByteBuffer> availableBuffers;
     private volatile boolean isRealCommit = true;
 
@@ -46,10 +58,12 @@ public class TransientStorePool {
      */
     public void init() {
         for (int i = 0; i < poolSize; i++) {
+            //分配直接内存
             ByteBuffer byteBuffer = ByteBuffer.allocateDirect(fileSize);
 
             final long address = ((DirectBuffer) byteBuffer).address();
             Pointer pointer = new Pointer(address);
+            //锁定内存
             LibC.INSTANCE.mlock(pointer, new NativeLong(fileSize));
 
             availableBuffers.offer(byteBuffer);
@@ -60,16 +74,23 @@ public class TransientStorePool {
         for (ByteBuffer byteBuffer : availableBuffers) {
             final long address = ((DirectBuffer) byteBuffer).address();
             Pointer pointer = new Pointer(address);
+            //不锁定内存
             LibC.INSTANCE.munlock(pointer, new NativeLong(fileSize));
         }
     }
 
+    /**
+     * 归还缓冲区
+     */
     public void returnBuffer(ByteBuffer byteBuffer) {
         byteBuffer.position(0);
         byteBuffer.limit(fileSize);
         this.availableBuffers.offerFirst(byteBuffer);
     }
 
+    /**
+     * 借用缓冲区
+     */
     public ByteBuffer borrowBuffer() {
         ByteBuffer buffer = availableBuffers.pollFirst();
         if (availableBuffers.size() < poolSize * 0.4) {
@@ -78,6 +99,9 @@ public class TransientStorePool {
         return buffer;
     }
 
+    /**
+     * 可用缓冲区数量
+     */
     public int availableBufferNums() {
         return availableBuffers.size();
     }

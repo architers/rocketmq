@@ -37,6 +37,9 @@ import org.apache.rocketmq.store.stats.BrokerStatsManager;
 
 public class ProducerManager {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
+    /**
+     * CHANNEL过期时间
+     */
     private static final long CHANNEL_EXPIRED_TIMEOUT = 1000 * 120;
     private static final int GET_AVAILABLE_CHANNEL_RETRY_COUNT = 3;
     private final ConcurrentHashMap<String /* group name */, ConcurrentHashMap<Channel, ClientChannelInfo>> groupChannelTable =
@@ -205,6 +208,9 @@ public class ProducerManager {
         }
     }
 
+    /**
+     * 轮训获取一个健康的Channel
+     */
     public Channel getAvailableChannel(String groupId) {
         if (groupId == null) {
             return null;

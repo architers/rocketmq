@@ -52,6 +52,7 @@ public class BrokerStartup {
 
     public static BrokerController start(BrokerController controller) {
         try {
+            //启动broker
             controller.start();
 
             String tip = String.format("The broker[%s, %s] boot success. serializeType=%s",
@@ -81,10 +82,13 @@ public class BrokerStartup {
 
     public static BrokerController buildBrokerController(String[] args) throws Exception {
         System.setProperty(RemotingCommand.REMOTING_VERSION_KEY, Integer.toString(MQVersion.CURRENT_VERSION));
-
+        //broker配置
         final BrokerConfig brokerConfig = new BrokerConfig();
+        //服务端配置（对我们开发来说，broker就是一个服务端:从broker拉取消息,消费的数据都是存贮到broker上的;）
         final NettyServerConfig nettyServerConfig = new NettyServerConfig();
+        //客户端配置（对于namesrv来说，broker节点就是客户端，broker需要发送心跳到broker上）
         final NettyClientConfig nettyClientConfig = new NettyClientConfig();
+        // 消息存储配置
         final MessageStoreConfig messageStoreConfig = new MessageStoreConfig();
         nettyServerConfig.setListenPort(10911);
         messageStoreConfig.setHaListenPort(0);
@@ -96,6 +100,7 @@ public class BrokerStartup {
             System.exit(-1);
         }
 
+        //加载-c指定的配置文件
         Properties properties = null;
         if (commandLine.hasOption('c')) {
             String file = commandLine.getOptionValue('c');
@@ -106,6 +111,11 @@ public class BrokerStartup {
             }
         }
 
+        /*
+         * 1.读取配置文件中的系统环境变量（"rocketmq.namesrv.domain和rocketmq.namesrv.domain.subgroup）
+         * 2.并将属性配置通过反射分别填充到brokerConfig、nettyServerConfig、nettyClientConfig、messageStoreConfig）
+         *   broker.conf中能配置哪些属性，就能从这里看出来
+         */
         if (properties != null) {
             properties2SystemEnv(properties);
             MixAll.properties2Object(properties, brokerConfig);
@@ -121,7 +131,7 @@ public class BrokerStartup {
             System.exit(-2);
         }
 
-        // Validate namesrvAddr
+        // Validate namesrvAddr（校验namesrv地址配置,多个用;分隔）
         String namesrvAddr = brokerConfig.getNamesrvAddr();
         if (StringUtils.isNotBlank(namesrvAddr)) {
             try {
@@ -136,13 +146,16 @@ public class BrokerStartup {
             }
         }
 
+        //访问消息在内存中比率,主节点默认为40，从节点30
         if (BrokerRole.SLAVE == messageStoreConfig.getBrokerRole()) {
             int ratio = messageStoreConfig.getAccessMessageInMemoryMaxRatio() - 10;
             messageStoreConfig.setAccessMessageInMemoryMaxRatio(ratio);
         }
 
         // Set broker role according to ha config
+        //如果没有开启主动自动切换controller模式，就设置主节点brokerId为0，并校验从节点>0
         if (!brokerConfig.isEnableControllerMode()) {
+
             switch (messageStoreConfig.getBrokerRole()) {
                 case ASYNC_MASTER:
                 case SYNC_MASTER:
@@ -160,6 +173,7 @@ public class BrokerStartup {
         }
 
         if (messageStoreConfig.isEnableDLegerCommitLog()) {
+            //TODO 暂时不知道什么意思
             brokerConfig.setBrokerId(-1);
         }
 
@@ -167,13 +181,14 @@ public class BrokerStartup {
             System.out.printf("The config enableControllerMode and enableDLegerCommitLog cannot both be true.%n");
             System.exit(-4);
         }
-
+        //haListenPort参数是HAService服务组件使用，用于Broker的主从同步
         if (messageStoreConfig.getHaListenPort() <= 0) {
             messageStoreConfig.setHaListenPort(nettyServerConfig.getListenPort() + 1);
         }
 
         brokerConfig.setInBrokerContainer(false);
 
+        //设置broker日志目录
         System.setProperty("brokerLogDir", "");
         if (brokerConfig.isIsolateLogEnable()) {
             System.setProperty("brokerLogDir", brokerConfig.getBrokerName() + "_" + brokerConfig.getBrokerId());
@@ -181,7 +196,10 @@ public class BrokerStartup {
         if (brokerConfig.isIsolateLogEnable() && messageStoreConfig.isEnableDLegerCommitLog()) {
             System.setProperty("brokerLogDir", brokerConfig.getBrokerName() + "_" + messageStoreConfig.getdLegerSelfId());
         }
-
+        /*
+         *  有 -p命令就打印所有的参数，有-m就打印重要的参数（标注ImportantField注解的字段就是重要参数），并退出程序
+         *  这里就是为了启动执行mqbroker命令，而非真的启动broker服务
+         */
         if (commandLine.hasOption('p')) {
             Logger console = LoggerFactory.getLogger(LoggerName.BROKER_CONSOLE_NAME);
             MixAll.printObjectProperties(console, brokerConfig);
@@ -197,17 +215,18 @@ public class BrokerStartup {
             MixAll.printObjectProperties(console, messageStoreConfig, true);
             System.exit(0);
         }
-
+        // 打印所有的配置
         log = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
         MixAll.printObjectProperties(log, brokerConfig);
         MixAll.printObjectProperties(log, nettyServerConfig);
         MixAll.printObjectProperties(log, nettyClientConfig);
         MixAll.printObjectProperties(log, messageStoreConfig);
 
+
         final BrokerController controller = new BrokerController(
             brokerConfig, nettyServerConfig, nettyClientConfig, messageStoreConfig);
 
-        // Remember all configs to prevent discard
+        // Remember all configs to prevent discard 记住所有的配置，防止丢失
         controller.getConfiguration().registerConfig(properties);
 
         return controller;
@@ -237,11 +256,13 @@ public class BrokerStartup {
     public static BrokerController createBrokerController(String[] args) {
         try {
             BrokerController controller = buildBrokerController(args);
+            //初始化brokerController
             boolean initResult = controller.initialize();
             if (!initResult) {
                 controller.shutdown();
                 System.exit(-3);
             }
+            //添加成功关闭的钩子函数，关闭的时候调用shutdown方法
             Runtime.getRuntime().addShutdownHook(new Thread(buildShutdownHook(controller)));
             return controller;
         } catch (Throwable e) {

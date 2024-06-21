@@ -39,6 +39,11 @@ public class BrokerConfig extends BrokerIdentity {
     @ImportantField
     private int listenPort = 6888;
 
+    /**
+     * brokerIP1 当前broker监听的IP(生产者和消费者连接broker使用的就是这个IP)
+     * brokerIP2 存在broker主从时，在broker主节点上配置了brokerIP2的话,broker从节点会连接主节点配置的brokerIP2来同步。
+     * 默认不配置brokerIP1和brokerIP2时，都会根据当前网卡选择一个IP使用，当你的机器有多块网卡时，很有可能会有问题。
+     */
     @ImportantField
     private String brokerIP1 = NetworkUtil.getLocalAddress();
     private String brokerIP2 = NetworkUtil.getLocalAddress();
@@ -136,6 +141,9 @@ public class BrokerConfig extends BrokerIdentity {
 
     private int sendHeartbeatTimeoutMillis = 1000;
 
+    /**
+     * 是否开启从clave节点拉取数据
+     */
     private boolean slaveReadEnable = false;
 
     private boolean disableConsumeIfConsumerReadSlowly = false;
@@ -226,7 +234,9 @@ public class BrokerConfig extends BrokerIdentity {
     // read message from pop retry topic v1, for the compatibility, will be removed in the future version
     private boolean retrieveMessageFromPopRetryTopicV1 = true;
     private boolean enableRetryTopicV2 = false;
-
+    /**
+     * 是否实时通知消费ID改变
+     */
     private boolean realTimeNotifyConsumerChange = true;
 
     private boolean litePullMessageEnable = true;
@@ -279,7 +289,7 @@ public class BrokerConfig extends BrokerIdentity {
     private int transactionOpBatchInterval = 3000;
 
     /**
-     * Acl feature switch
+     * Acl feature switch（是否开启权限）
      */
     @ImportantField
     private boolean aclEnable = false;
@@ -310,6 +320,9 @@ public class BrokerConfig extends BrokerIdentity {
 
     private boolean asyncSendEnable = true;
 
+    /**
+     * 使用服务器端重置偏移 TODO1 有什么作用
+     */
     private boolean useServerSideResetOffset = true;
 
     private long consumerOffsetUpdateVersionStep = 500;
@@ -327,6 +340,7 @@ public class BrokerConfig extends BrokerIdentity {
 
     /**
      * Is startup controller mode, which support auto switch broker's role.
+     * 是否能够主从切换
      */
     private boolean enableControllerMode = false;
 
@@ -382,7 +396,7 @@ public class BrokerConfig extends BrokerIdentity {
     private boolean usePIDColdCtrStrategy = true;
     private long cgColdReadThreshold = 3 * 1024 * 1024;
     private long globalColdReadThreshold = 100 * 1024 * 1024;
-    
+
     /**
      * The interval to fetch namesrv addr, default value is 10 second
      */
@@ -1746,11 +1760,11 @@ public class BrokerConfig extends BrokerIdentity {
     public void setUseStaticSubscription(boolean useStaticSubscription) {
         this.useStaticSubscription = useStaticSubscription;
     }
-    
+
     public long getFetchNamesrvAddrInterval() {
         return fetchNamesrvAddrInterval;
     }
-    
+
     public void setFetchNamesrvAddrInterval(final long fetchNamesrvAddrInterval) {
         this.fetchNamesrvAddrInterval = fetchNamesrvAddrInterval;
     }

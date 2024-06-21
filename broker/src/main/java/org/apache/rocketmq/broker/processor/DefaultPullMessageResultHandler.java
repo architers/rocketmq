@@ -89,9 +89,11 @@ public class DefaultPullMessageResultHandler implements PullMessageResultHandler
         PullMessageProcessor processor = brokerController.getPullMessageProcessor();
         final String clientAddress = RemotingHelper.parseChannelRemoteAddr(channel);
         TopicConfig topicConfig = this.brokerController.getTopicConfigManager().selectTopicConfig(requestHeader.getTopic());
+        //撰写响应头
         processor.composeResponseHeader(requestHeader, getMessageResult, topicConfig.getTopicSysFlag(),
             subscriptionGroupConfig, response, clientAddress);
         try {
+            //执行消费前的钩子函数
             processor.executeConsumeMessageHookBefore(request, requestHeader, getMessageResult, brokerAllowSuspend, response.getCode());
         } catch (AbortProcessException e) {
             response.setCode(e.getResponseCode());
@@ -101,13 +103,15 @@ public class DefaultPullMessageResultHandler implements PullMessageResultHandler
 
         //rewrite the response for the static topic
         final PullMessageResponseHeader responseHeader = (PullMessageResponseHeader) response.readCustomHeader();
+        //TODO1
         RemotingCommand rewriteResult = processor.rewriteResponseForStaticTopic(requestHeader, responseHeader, mappingContext, response.getCode());
         if (rewriteResult != null) {
             response = rewriteResult;
         }
-
+        //更新广播的拉取的offset
         processor.updateBroadcastPulledOffset(requestHeader.getTopic(), requestHeader.getConsumerGroup(),
             requestHeader.getQueueId(), requestHeader, channel, response, getMessageResult.getNextBeginOffset());
+        //尝试去提交offset
         processor.tryCommitOffset(brokerAllowSuspend, requestHeader, getMessageResult.getNextBeginOffset(),
             clientAddress);
 
@@ -183,6 +187,7 @@ public class DefaultPullMessageResultHandler implements PullMessageResultHandler
                     int queueId = requestHeader.getQueueId();
                     PullRequest pullRequest = new PullRequest(request, channel, pollingTimeMills,
                         this.brokerController.getMessageStore().now(), offset, subscriptionData, messageFilter);
+                    //没有找到消息，就hold住pull请求（PullRequestHoldService有定时任务扫描队列中是否有新的数据，有就主动推送）
                     this.brokerController.getPullRequestHoldService().suspendPullRequest(topic, queueId, pullRequest);
                     return null;
                 }
@@ -265,6 +270,7 @@ public class DefaultPullMessageResultHandler implements PullMessageResultHandler
         }
 
         this.brokerController.getBrokerStatsManager().recordDiskFallBehindTime(group, topic, queueId, this.brokerController.getMessageStore().now() - storeTimestamp);
+        //TODO
         return byteBuffer.array();
     }
 

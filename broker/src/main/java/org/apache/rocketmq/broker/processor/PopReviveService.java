@@ -300,6 +300,7 @@ public class PopReviveService extends ServiceThread {
         HashMap<String, PopCheckPoint> mockPointMap = new HashMap<>();
         long startScanTime = System.currentTimeMillis();
         long endTime = 0;
+        //得到consumeOffset
         long consumeOffset = this.brokerController.getConsumerOffsetManager().queryOffset(PopAckConstants.REVIVE_GROUP, reviveTopic, queueId);
         long oldOffset = Math.max(reviveOffset, consumeOffset);
         consumeReviveObj.oldOffset = oldOffset;
@@ -616,11 +617,13 @@ public class PopReviveService extends ServiceThread {
         int slow = 1;
         while (!this.isStopped()) {
             try {
+                //broker延迟启动判断
                 if (System.currentTimeMillis() < brokerController.getShouldStartTime()) {
                     POP_LOGGER.info("PopReviveService Ready to run after {}", brokerController.getShouldStartTime());
                     this.waitForRunning(1000);
                     continue;
                 }
+                //pop消息review时间间隔，默认1s
                 this.waitForRunning(brokerController.getBrokerConfig().getReviveInterval());
                 if (!shouldRunPopRevive) {
                     POP_LOGGER.info("skip start revive topic={}, reviveQueueId={}", reviveTopic, queueId);

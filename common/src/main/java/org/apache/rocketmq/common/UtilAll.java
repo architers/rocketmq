@@ -287,6 +287,9 @@ public class UtilAll {
         }
     }
 
+    /**
+     * crc32要用来检测或者校验数据经过传输或者保存后可能出现的错误
+     */
     public static int crc32(byte[] array) {
         if (array != null) {
             return crc32(array, 0, array.length);

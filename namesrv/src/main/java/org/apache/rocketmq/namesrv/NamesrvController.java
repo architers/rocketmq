@@ -99,12 +99,19 @@ public class NamesrvController {
     }
 
     public boolean initialize() {
+        //加载kv配置
         loadConfig();
+        //初始化NettyRemoting
         initiateNetworkComponents();
+        //初始化线程池
         initiateThreadExecutors();
+        //注册处理器
         registerProcessor();
+        //开启定时任务
         startScheduleService();
+        //初始化tls配置
         initiateSslContext();
+        //初始化rpc钩子函数
         initiateRpcHooks();
         return true;
     }
@@ -114,9 +121,10 @@ public class NamesrvController {
     }
 
     private void startScheduleService() {
+        //扫描不健康的broker(默认5s扫描一次）
         this.scanExecutorService.scheduleAtFixedRate(NamesrvController.this.routeInfoManager::scanNotActiveBroker,
             5, this.namesrvConfig.getScanNotActiveBrokerInterval(), TimeUnit.MILLISECONDS);
-
+        //每10分钟打印一次KV配置
         this.scheduledExecutorService.scheduleAtFixedRate(NamesrvController.this.kvConfigManager::printAllPeriodically,
             1, 10, TimeUnit.MINUTES);
 
@@ -208,6 +216,7 @@ public class NamesrvController {
         } else {
             // Support get route info only temporarily
             ClientRequestProcessor clientRequestProcessor = new ClientRequestProcessor(this);
+            //得到通过topic路由信息
             this.remotingServer.registerProcessor(RequestCode.GET_ROUTEINFO_BY_TOPIC, clientRequestProcessor, this.clientRequestExecutor);
 
             this.remotingServer.registerDefaultProcessor(new DefaultRequestProcessor(this), this.defaultExecutor);

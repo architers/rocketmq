@@ -307,13 +307,13 @@ public class MQClientInstance {
                     if (null == this.clientConfig.getNamesrvAddr()) {
                         this.mQClientAPIImpl.fetchNameServerAddr();
                     }
-                    // Start request-response channel
+                    // Start request-response channel（启动请求-响应通道）
                     this.mQClientAPIImpl.start();
-                    // Start various schedule tasks
+                    // Start various schedule tasks（启动定时任务）
                     this.startScheduledTask();
-                    // Start pull service
+                    // Start pull service（启动pullMessageService)
                     this.pullMessageService.start();
-                    // Start rebalance service
+                    // Start rebalance service(启动负载均衡-consumer才会有负载均衡）
                     this.rebalanceService.start();
                     // Start push service
                     this.defaultMQProducer.getDefaultMQProducerImpl().start(false);
@@ -329,6 +329,7 @@ public class MQClientInstance {
     }
 
     private void startScheduledTask() {
+        //每2分钟获取nameServer地址
         if (null == this.clientConfig.getNamesrvAddr()) {
             this.scheduledExecutorService.scheduleAtFixedRate(() -> {
                 try {
@@ -338,7 +339,7 @@ public class MQClientInstance {
                 }
             }, 1000 * 10, 1000 * 60 * 2, TimeUnit.MILLISECONDS);
         }
-
+        //更新topic路由信息（默认30s)
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 MQClientInstance.this.updateTopicRouteInfoFromNameServer();
@@ -347,6 +348,7 @@ public class MQClientInstance {
             }
         }, 10, this.clientConfig.getPollNameServerInterval(), TimeUnit.MILLISECONDS);
 
+        //清除本地不在线的broker|向所有broker发送心跳地址（默认30s）
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 MQClientInstance.this.cleanOfflineBroker();
@@ -355,7 +357,7 @@ public class MQClientInstance {
                 log.error("ScheduledTask sendHeartbeatToAllBroker exception", e);
             }
         }, 1000, this.clientConfig.getHeartbeatBrokerInterval(), TimeUnit.MILLISECONDS);
-
+        //持久化consumeOffset(默认5秒）
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 MQClientInstance.this.persistAllConsumerOffset();
@@ -363,7 +365,7 @@ public class MQClientInstance {
                 log.error("ScheduledTask persistAllConsumerOffset exception", e);
             }
         }, 1000 * 10, this.clientConfig.getPersistConsumerOffsetInterval(), TimeUnit.MILLISECONDS);
-
+        //每一分钟调整线程池
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 MQClientInstance.this.adjustThreadPool();
@@ -768,6 +770,7 @@ public class MQClientInstance {
             if (this.lockNamesrv.tryLock(LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
                 try {
                     TopicRouteData topicRouteData;
+                    //如果使用isDefault，就得到TBW102这个默认topic的路由信息
                     if (isDefault && defaultMQProducer != null) {
                         topicRouteData = this.mQClientAPIImpl.getDefaultTopicRouteInfoFromNameServer(clientConfig.getMqClientApiTimeout());
                         if (topicRouteData != null) {
@@ -778,6 +781,7 @@ public class MQClientInstance {
                             }
                         }
                     } else {
+                        //得到指定的topic路由信息
                         topicRouteData = this.mQClientAPIImpl.getTopicRouteInfoFromNameServer(topic, clientConfig.getMqClientApiTimeout());
                     }
                     if (topicRouteData != null) {
@@ -790,12 +794,12 @@ public class MQClientInstance {
                         }
 
                         if (changed) {
-
+                            //更新broker集群对应的地址信息
                             for (BrokerData bd : topicRouteData.getBrokerDatas()) {
                                 this.brokerAddrTable.put(bd.getBrokerName(), bd.getBrokerAddrs());
                             }
 
-                            // Update endpoint map
+                            // Update endpoint map（更新端点信息->根据topic负载到队列，队列再定位是哪个broker地址）
                             {
                                 ConcurrentMap<MessageQueue, String> mqEndPoints = topicRouteData2EndpointsForStaticTopic(topic, topicRouteData);
                                 if (!mqEndPoints.isEmpty()) {
@@ -803,7 +807,7 @@ public class MQClientInstance {
                                 }
                             }
 
-                            // Update Pub info
+                            // Update Pub info（更新发布信息）
                             {
                                 TopicPublishInfo publishInfo = topicRouteData2TopicPublishInfo(topic, topicRouteData);
                                 publishInfo.setHaveTopicRouterInfo(true);
@@ -815,7 +819,7 @@ public class MQClientInstance {
                                 }
                             }
 
-                            // Update sub info
+                            // Update sub info（更新消费者订阅信息，也就是一个topic有哪些读的队列）
                             if (!consumerTable.isEmpty()) {
                                 Set<MessageQueue> subscribeInfo = topicRouteData2TopicSubscribeInfo(topic, topicRouteData);
                                 for (Entry<String, MQConsumerInner> entry : this.consumerTable.entrySet()) {
@@ -1122,6 +1126,9 @@ public class MQClientInstance {
         return null;
     }
 
+    /**
+     * 通过brokerName从发布信息中获取broker地址
+     */
     public String findBrokerAddressInPublish(final String brokerName) {
         if (brokerName == null) {
             return null;
@@ -1182,6 +1189,9 @@ public class MQClientInstance {
         return 0;
     }
 
+    /**
+     * 根据消费组获取指定topic的consumeId集合
+     */
     public List<String> findConsumerIdList(final String topic, final String group) {
         String brokerAddr = this.findBrokerAddrByTopic(topic);
         if (null == brokerAddr) {
@@ -1325,6 +1335,9 @@ public class MQClientInstance {
         return topicRouteTable;
     }
 
+    /**
+     * 直接消费（在mq控制台上，可以点击重新发送，就是调用的这个接口，进行消费数据的）
+     */
     public ConsumeMessageDirectlyResult consumeMessageDirectly(final MessageExt msg,
         final String consumerGroup,
         final String brokerName) {

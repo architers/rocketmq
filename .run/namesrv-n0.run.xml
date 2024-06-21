@@ -1,0 +1,17 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="namesrv-n0" type="Application" factoryName="Application" folderName="cluster-3n-namesrv">
+    <option name="MAIN_CLASS_NAME" value="org.apache.rocketmq.namesrv.NamesrvStartup" />
+    <module name="rocketmq-namesrv" />
+    <option name="PROGRAM_PARAMETERS" value="-c conf/controller/cluster-3n-namesrv/namesrv-n0.conf" />
+    <option name="VM_PARAMETERS" value="-Xmx350m" />
+    <extension name="coverage">
+      <pattern>
+        <option name="PATTERN" value="org.apache.rocketmq.namesrv.*" />
+        <option name="ENABLED" value="true" />
+      </pattern>
+    </extension>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

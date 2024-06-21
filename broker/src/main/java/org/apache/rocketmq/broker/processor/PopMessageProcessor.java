@@ -94,6 +94,9 @@ import static org.apache.rocketmq.remoting.metrics.RemotingMetricsConstant.LABEL
 import static org.apache.rocketmq.remoting.metrics.RemotingMetricsConstant.LABEL_RESPONSE_CODE;
 import static org.apache.rocketmq.remoting.metrics.RemotingMetricsConstant.LABEL_RESULT;
 
+/**
+ * pop消息处理器（5.0后新的一种消费模式）
+ */
 public class PopMessageProcessor implements NettyRequestProcessor {
     private static final Logger POP_LOGGER =
         LoggerFactory.getLogger(LoggerName.ROCKETMQ_POP_LOGGER_NAME);
@@ -110,6 +113,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
     public PopMessageProcessor(final BrokerController brokerController) {
         this.brokerController = brokerController;
         this.reviveTopic = PopAckConstants.buildClusterReviveTopic(this.brokerController.getBrokerConfig().getBrokerClusterName());
+        // pop长轮训service
         this.popLongPollingService = new PopLongPollingService(brokerController, this);
         this.queueLockManager = new QueueLockManager();
         this.popBufferMergeService = new PopBufferMergeService(this.brokerController, this);
@@ -128,6 +132,10 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         return queueLockManager;
     }
 
+    /**
+     *
+     * 得到消息ack唯一ID
+     */
     public static String genAckUniqueId(AckMsg ackMsg) {
         return ackMsg.getTopic()
             + PopAckConstants.SPLIT + ackMsg.getQueueId()
@@ -146,7 +154,10 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                 + PopAckConstants.SPLIT + batchAckMsg.getPopTime()
                 + PopAckConstants.SPLIT + PopAckConstants.BATCH_ACK_TAG;
     }
-
+    /**
+     *
+     * 得到pop消息句柄信息的唯一ID(ACK 时要通过句柄来定位到它)
+     */
     public static String genCkUniqueId(PopCheckPoint ck) {
         return ck.getTopic()
             + PopAckConstants.SPLIT + ck.getQueueId()
@@ -213,28 +224,30 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         if (requestHeader.isOrder()) {
             orderCountInfo = new StringBuilder(64);
         }
-
+        //补偿消费者信息
         brokerController.getConsumerManager().compensateBasicConsumerInfo(requestHeader.getConsumerGroup(),
             ConsumeType.CONSUME_POP, MessageModel.CLUSTERING);
-
+        //设置为不透明
         response.setOpaque(request.getOpaque());
 
         if (brokerController.getBrokerConfig().isEnablePopLog()) {
             POP_LOGGER.info("receive PopMessage request command, {}", request);
         }
-
+        //判断是否超时
         if (requestHeader.isTimeoutTooMuch()) {
             response.setCode(ResponseCode.POLLING_TIMEOUT);
             response.setRemark(String.format("the broker[%s] pop message is timeout too much",
                 this.brokerController.getBrokerConfig().getBrokerIP1()));
             return response;
         }
+        //判断broker是否有读的权限
         if (!PermName.isReadable(this.brokerController.getBrokerConfig().getBrokerPermission())) {
             response.setCode(ResponseCode.NO_PERMISSION);
             response.setRemark(String.format("the broker[%s] pop message is forbidden",
                 this.brokerController.getBrokerConfig().getBrokerIP1()));
             return response;
         }
+        //pop消息最大数量为32
         if (requestHeader.getMaxMsgNums() > 32) {
             response.setCode(ResponseCode.SYSTEM_ERROR);
             response.setRemark(String.format("the broker[%s] pop message's num is greater than 32",
@@ -290,7 +303,9 @@ public class PopMessageProcessor implements NettyRequestProcessor {
             response.setRemark("subscription group no permission, " + requestHeader.getConsumerGroup());
             return response;
         }
-
+        /*
+         * 构建消息过滤器，并补偿订阅数据（消费组下的topic订阅信息）
+         */
         BrokerConfig brokerConfig = brokerController.getBrokerConfig();
         ExpressionMessageFilter messageFilter = null;
         if (requestHeader.getExp() != null && requestHeader.getExp().length() > 0) {

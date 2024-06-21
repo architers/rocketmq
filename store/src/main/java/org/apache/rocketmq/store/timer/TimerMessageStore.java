@@ -453,6 +453,7 @@ public class TimerMessageStore {
     public void start() {
         this.shouldStartTime = storeConfig.getDisappearTimeAfterStart() + System.currentTimeMillis();
         maybeMoveWriteTime();
+        //启动拉取定时消息的service
         enqueueGetService.start();
         enqueuePutService.start();
         dequeueWarmService.start();
@@ -1288,7 +1289,10 @@ public class TimerMessageStore {
 
     }
 
-    public class TimerEnqueueGetService extends ServiceThread {
+    /**
+     * 负责从系统定时 Topic 里面拉取消息放入 enqueuePutQueue 等待 TimerEnqueuePutService 的处理
+     */
+    public  class TimerEnqueueGetService extends ServiceThread {
 
         @Override
         public String getServiceName() {
@@ -1310,7 +1314,9 @@ public class TimerMessageStore {
             TimerMessageStore.LOGGER.info(this.getServiceName() + " service end");
         }
     }
-
+    /**
+     * 负责构建 TimerLog 记录，并将其放入时间轮的对应的刻度中
+     */
     public String getServiceThreadName() {
         String brokerIdentifier = "";
         if (TimerMessageStore.this.messageStore instanceof DefaultMessageStore) {
@@ -1415,7 +1421,9 @@ public class TimerMessageStore {
             TimerMessageStore.LOGGER.info(this.getServiceName() + " service end");
         }
     }
-
+    /**
+     * 负责转动时间轮，并取出当前时间刻度的所有 TimerLog 记录放入 dequeueGetQueue
+     */
     public class TimerDequeueGetService extends ServiceThread {
 
         @Override
@@ -1456,7 +1464,9 @@ public class TimerMessageStore {
             return this.state == state;
         }
     }
-
+    /**
+     * 负责判断队列中的消息是否已经到期，如果已经到期了，那么将其投入用户的 Topic 中，等待消费消费；如果还没有到期，那么重新投入系统定时 Topic，等待重新进入时间轮
+     */
     public class TimerDequeuePutMessageService extends AbstractStateService {
 
         @Override
@@ -1527,7 +1537,9 @@ public class TimerMessageStore {
             setState(AbstractStateService.END);
         }
     }
-
+    /**
+     * 负责根据 TimerLog 记录，从 CommitLog 中读取消息
+     */
     public class TimerDequeueGetMessageService extends AbstractStateService {
 
         @Override

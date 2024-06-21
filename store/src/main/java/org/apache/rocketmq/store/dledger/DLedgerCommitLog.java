@@ -60,6 +60,7 @@ import io.openmessaging.storage.dledger.utils.DLedgerUtils;
 
 /**
  * Store all metadata downtime for recovery, data protection reliability
+ * DLedger模式下的commitLog文件
  */
 public class DLedgerCommitLog extends CommitLog {
 

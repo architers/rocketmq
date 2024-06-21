@@ -176,7 +176,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
     private long adjustThreadPoolNumsThreshold = 100000;
 
     /**
-     * Concurrently max span offset.it has no effect on sequential consumption
+     * Concurrently max span offset.it has no effect on sequential consumption（当前最大跨度 offset.it 对顺序消耗没有影响）
      */
     private int consumeConcurrentlyMaxSpan = 2000;
 

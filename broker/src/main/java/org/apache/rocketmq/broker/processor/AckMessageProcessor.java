@@ -48,6 +48,11 @@ import org.apache.rocketmq.store.PutMessageStatus;
 import org.apache.rocketmq.store.pop.AckMsg;
 import org.apache.rocketmq.store.pop.BatchAckMsg;
 
+/**
+ * AckMessageProcessor（ack消息处理器，pop消息才会ack)
+ *
+ * TODO1 ack消息流程
+ */
 public class AckMessageProcessor implements NettyRequestProcessor {
     private static final Logger POP_LOGGER = LoggerFactory.getLogger(LoggerName.ROCKETMQ_POP_LOGGER_NAME);
     private final BrokerController brokerController;
@@ -135,7 +140,8 @@ public class AckMessageProcessor implements NettyRequestProcessor {
 
             long minOffset = this.brokerController.getMessageStore().getMinOffsetInQueue(requestHeader.getTopic(), requestHeader.getQueueId());
             long maxOffset = this.brokerController.getMessageStore().getMaxOffsetInQueue(requestHeader.getTopic(), requestHeader.getQueueId());
-            if (requestHeader.getOffset() < minOffset || requestHeader.getOffset() > maxOffset) {
+        //ack的offset不在最小与最大偏移量的范围内
+        if (requestHeader.getOffset() < minOffset || requestHeader.getOffset() > maxOffset) {
                 String errorInfo = String.format("offset is illegal, key:%s@%d, commit:%d, store:%d~%d",
                         requestHeader.getTopic(), requestHeader.getQueueId(), requestHeader.getOffset(), minOffset, maxOffset);
                 POP_LOGGER.warn(errorInfo);
@@ -275,6 +281,7 @@ public class AckMessageProcessor implements NettyRequestProcessor {
                 && putMessageResult.getPutMessageStatus() != PutMessageStatus.SLAVE_NOT_AVAILABLE) {
             POP_LOGGER.error("put ack msg error:" + putMessageResult);
         }
+        //增加pop接收ack 的put数量
         PopMetricsManager.incPopReviveAckPutCount(ackMsg, putMessageResult.getPutMessageStatus());
         brokerController.getPopInflightMessageCounter().decrementInFlightMessageNum(topic, consumeGroup, popTime, qId, ackCount);
     }

@@ -308,7 +308,9 @@ public class BrokerController {
         this.nettyServerConfig = nettyServerConfig;
         this.nettyClientConfig = nettyClientConfig;
         this.messageStoreConfig = messageStoreConfig;
+        //构建broker存储host
         this.setStoreHost(new InetSocketAddress(this.getBrokerConfig().getBrokerIP1(), getListenPort()));
+        // brokerStatsManager,用于统计broker各种数据（比如发送多少、拉取多少等）---Lmq就是轻量级消息队列的意思
         this.brokerStatsManager = messageStoreConfig.isEnableLmq() ? new LmqBrokerStatsManager(this.brokerConfig.getBrokerClusterName(), this.brokerConfig.isEnableDetailStat()) : new BrokerStatsManager(this.brokerConfig.getBrokerClusterName(), this.brokerConfig.isEnableDetailStat());
         this.broadcastOffsetManager = new BroadcastOffsetManager(this);
         if (this.messageStoreConfig.isEnableRocksDBStore()) {
@@ -321,29 +323,49 @@ public class BrokerController {
             this.consumerOffsetManager = messageStoreConfig.isEnableLmq() ? new LmqConsumerOffsetManager(this) : new ConsumerOffsetManager(this);
         }
         this.topicQueueMappingManager = new TopicQueueMappingManager(this);
+        //拉消息处理器
         this.pullMessageProcessor = new PullMessageProcessor(this);
+        //探测消息（有点随机取的意思）
         this.peekMessageProcessor = new PeekMessageProcessor(this);
+        //存储pullRequest,防止队列没有消息，消费者一直发送pullRequest的命令
         this.pullRequestHoldService = messageStoreConfig.isEnableLmq() ? new LmqPullRequestHoldService(this) : new PullRequestHoldService(this);
+        // 改变消息可见性处理器(只有Pop的消息才会有）
         this.popMessageProcessor = new PopMessageProcessor(this);
+        //通知管理器
         this.notificationProcessor = new NotificationProcessor(this);
+        //TODO1 有什么作用
         this.pollingInfoProcessor = new PollingInfoProcessor(this);
+        //ack消息处理器
         this.ackMessageProcessor = new AckMessageProcessor(this);
+        //改变消息可见性处理器（pop消息用）
         this.changeInvisibleTimeProcessor = new ChangeInvisibleTimeProcessor(this);
+        //发送消息处理器
         this.sendMessageProcessor = new SendMessageProcessor(this);
+        //回复消息处理器
         this.replyMessageProcessor = new ReplyMessageProcessor(this);
+        //消息到达监听器，当消息抵达的时候，会通知pullRequestHoldService、popMessageProcessor、notificationProcessor
         this.messageArrivingListener = new NotifyMessageArrivingListener(this.pullRequestHoldService, this.popMessageProcessor, this.notificationProcessor);
+        //消费者ID改变监听器
         this.consumerIdsChangeListener = new DefaultConsumerIdsChangeListener(this);
+        //消费者管理
         this.consumerManager = new ConsumerManager(this.consumerIdsChangeListener, this.brokerStatsManager, this.brokerConfig);
+        //生产者管理
         this.producerManager = new ProducerManager(this.brokerStatsManager);
+        //消费者消费消息过滤信息管理器
         this.consumerFilterManager = new ConsumerFilterManager(this);
+        //TODO1
         this.consumerOrderInfoManager = new ConsumerOrderInfoManager(this);
+        //TODO1
         this.popInflightMessageCounter = new PopInflightMessageCounter(this);
+        //扫描异常的client
         this.clientHousekeepingService = new ClientHousekeepingService(this);
+        //broker调用client
         this.broker2Client = new Broker2Client(this);
         this.scheduleMessageService = new ScheduleMessageService(this);
         this.coldDataPullRequestHoldService = new ColdDataPullRequestHoldService(this);
         this.coldDataCgCtrService = new ColdDataCgCtrService(this);
 
+        //broker调用外部api
         if (nettyClientConfig != null) {
             this.brokerOuterAPI = new BrokerOuterAPI(nettyClientConfig);
         }
@@ -352,7 +374,9 @@ public class BrokerController {
         this.clientManageProcessor = new ClientManageProcessor(this);
         this.slaveSynchronize = new SlaveSynchronize(this);
         this.endTransactionProcessor = new EndTransactionProcessor(this);
-
+        /*
+         * 初始化各种线程池队列的大小
+         */
         this.sendThreadPoolQueue = new LinkedBlockingQueue<>(this.brokerConfig.getSendThreadPoolQueueCapacity());
         this.putThreadPoolQueue = new LinkedBlockingQueue<>(this.brokerConfig.getPutThreadPoolQueueCapacity());
         this.pullThreadPoolQueue = new LinkedBlockingQueue<>(this.brokerConfig.getPullThreadPoolQueueCapacity());
@@ -377,9 +401,9 @@ public class BrokerController {
             brokerConfigPath = BrokerPathConfigHelper.getBrokerConfigPath();
         }
         this.configuration = new Configuration(
-            LOG,
-            brokerConfigPath,
-            this.brokerConfig, this.nettyServerConfig, this.nettyClientConfig, this.messageStoreConfig
+                LOG,
+                brokerConfigPath,
+                this.brokerConfig, this.nettyServerConfig, this.nettyClientConfig, this.messageStoreConfig
         );
 
         this.brokerStatsManager.setProduerStateGetter(new BrokerStatsManager.StateGetter() {
@@ -404,11 +428,14 @@ public class BrokerController {
             }
         });
 
+
+        //new 当前的broker信息，并添加到集群信息中
         this.brokerMemberGroup = new BrokerMemberGroup(this.brokerConfig.getBrokerClusterName(), this.brokerConfig.getBrokerName());
         this.brokerMemberGroup.getBrokerAddrs().put(this.brokerConfig.getBrokerId(), this.getBrokerAddr());
 
         this.escapeBridge = new EscapeBridge(this);
 
+        //主题路由信息管理器
         this.topicRouteInfoManager = new TopicRouteInfoManager(this);
 
         if (this.brokerConfig.isEnableSlaveActingMaster() && !this.brokerConfig.isSkipPreOnline()) {
@@ -572,7 +599,11 @@ public class BrokerController {
         this.topicQueueMappingCleanService = new TopicQueueMappingCleanService(this);
     }
 
+    /**
+     * 初始化broker的定时任务
+     */
     protected void initializeBrokerScheduledTasks() {
+        //到下一天的早上的时间
         final long initialDelay = UtilAll.computeNextMorningTimeMillis() - System.currentTimeMillis();
         final long period = TimeUnit.DAYS.toMillis(1);
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
@@ -584,8 +615,12 @@ public class BrokerController {
                     LOG.error("BrokerController: failed to record broker stats", e);
                 }
             }
+            //每天十二点执行一次
         }, initialDelay, period, TimeUnit.MILLISECONDS);
 
+        /*
+         *定时持久化consumeOffset
+         */
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
@@ -593,11 +628,15 @@ public class BrokerController {
                     BrokerController.this.consumerOffsetManager.persist();
                 } catch (Throwable e) {
                     LOG.error(
-                        "BrokerController: failed to persist config file of consumerOffset", e);
+                            "BrokerController: failed to persist config file of consumerOffset", e);
                 }
             }
+            //10秒后，每五秒持久化consumerOffset
         }, 1000 * 10, this.brokerConfig.getFlushConsumerOffsetInterval(), TimeUnit.MILLISECONDS);
 
+        /*
+         * 定时持久化consumerFilter和consumerOrder
+         */
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
@@ -612,6 +651,9 @@ public class BrokerController {
             }
         }, 1000 * 10, 1000 * 10, TimeUnit.MILLISECONDS);
 
+        /*
+         *保护broker,如果消费者消费过慢，就禁用消费组（默认没有开启）
+         */
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
@@ -621,8 +663,12 @@ public class BrokerController {
                     LOG.error("BrokerController: failed to protectBroker", e);
                 }
             }
+            //延迟3分钟，并每三分钟执行一次
         }, 3, 3, TimeUnit.MINUTES);
 
+        /*
+         *每1秒打印一次SlowTimeMills
+         */
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
@@ -634,6 +680,10 @@ public class BrokerController {
             }
         }, 10, 1, TimeUnit.SECONDS);
 
+        /*
+         * 定时打印转发commitLog数据落后的字节数
+         * ps:consumeLog和index文件都是定时从commit中Dispatch的
+         */
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -645,8 +695,14 @@ public class BrokerController {
                     LOG.error("Failed to print dispatchBehindBytes", e);
                 }
             }
+            //10秒后执行，每分钟执行一次
         }, 1000 * 10, 1000 * 60, TimeUnit.MILLISECONDS);
 
+        /*
+         *在开启DLeger主从的情况下：
+         * 当是从节点的情况下，会定时从主节点同步TimerCheckpoint,并同步其他主节点信息（consumeOffset、消息组信息等）
+         * 当是主节点的情况下，会定时打印没有同步commitLog的字节数据
+         */
         if (!messageStoreConfig.isEnableDLegerCommitLog() && !messageStoreConfig.isDuplicationEnable() && !brokerConfig.isEnableControllerMode()) {
             if (BrokerRole.SLAVE == this.messageStoreConfig.getBrokerRole()) {
                 if (this.messageStoreConfig.getHaMasterAddress() != null && this.messageStoreConfig.getHaMasterAddress().length() >= HA_ADDRESS_MIN_LENGTH) {
@@ -687,10 +743,11 @@ public class BrokerController {
                             LOG.error("Failed to print diff of master and slave.", e);
                         }
                     }
+                    //10秒后，每分钟打印一次
                 }, 1000 * 10, 1000 * 60, TimeUnit.MILLISECONDS);
             }
         }
-
+        //如果开启了controller模式，就updateMasterHAServerAddrPeriodically(定时更新masterHaService地址)为true
         if (this.brokerConfig.isEnableControllerMode()) {
             this.updateMasterHAServerAddrPeriodically = true;
         }
@@ -713,6 +770,7 @@ public class BrokerController {
                         LOG.error("Failed to update nameServer address list", e);
                     }
                 }
+                //两分钟更新一次
             }, 1000 * 10, 1000 * 60 * 2, TimeUnit.MILLISECONDS);
         } else if (this.brokerConfig.isFetchNamesrvAddrByAddressServer()) {
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
@@ -738,6 +796,7 @@ public class BrokerController {
     }
 
     public boolean initializeMetadata() {
+        //加载对应的配置文件
         boolean result = this.topicConfigManager.load();
         result = result && this.topicQueueMappingManager.load();
         result = result && this.consumerOffsetManager.load();
@@ -756,14 +815,14 @@ public class BrokerController {
             } else {
                 defaultMessageStore = new DefaultMessageStore(this.messageStoreConfig, this.brokerStatsManager, this.messageArrivingListener, this.brokerConfig, topicConfigManager.getTopicConfigTable());
             }
-
+           //DLeger架构
             if (messageStoreConfig.isEnableDLegerCommitLog()) {
                 DLedgerRoleChangeHandler roleChangeHandler =
                     new DLedgerRoleChangeHandler(this, defaultMessageStore);
                 ((DLedgerCommitLog) defaultMessageStore.getCommitLog())
                     .getdLedgerServer().getDLedgerLeaderElector().addRoleChangeHandler(roleChangeHandler);
             }
-
+            //broker统计
             this.brokerStats = new BrokerStats(defaultMessageStore);
 
             // Load store plugin
@@ -809,42 +868,47 @@ public class BrokerController {
             this.replicasManager.setFenced(true);
         }
 
+        //加载message存储的钩子，并加载commitLog,consumeQueue以及index等
         if (messageStore != null) {
             registerMessageStoreHook();
             result = this.messageStore.load();
         }
-
+        //加载时间轮定时任务信息
         if (messageStoreConfig.isTimerWheelEnable()) {
             result = result && this.timerMessageStore.load();
         }
 
         //scheduleMessageService load after messageStore load success
+        //加载延迟级别的定时任务的配置
         result = result && this.scheduleMessageService.load();
 
+        //加载broker附件插件（默认的情况下是没有的)
         for (BrokerAttachedPlugin brokerAttachedPlugin : brokerAttachedPlugins) {
             if (brokerAttachedPlugin != null) {
                 result = result && brokerAttachedPlugin.load();
             }
         }
-
+        //指标管理
         this.brokerMetricsManager = new BrokerMetricsManager(this);
 
         if (result) {
 
+            //初始化netty服务端server
             initializeRemotingServer();
-
+            //初始化线程池相关资源信息
             initializeResources();
-
+            //注册处理器
             registerProcessor();
-
+            //初始化broker相关定时任务
             initializeScheduledTasks();
-
+            //初始化事务相关信息
             initialTransaction();
-
+            //TODO1 acl是什么
             initialAcl();
-
+            //初始化RPC相关的钩子
             initialRpcHooks();
-
+            //tls开启，就添加文件监听
+            //(安全传输层协议（TLS）用于在两个通信应用程序之间提供保密性和数据完整性)
             if (TlsSystemConfig.tlsMode != TlsMode.DISABLED) {
                 // Register a listener to reload SslContext
                 try {
@@ -891,9 +955,15 @@ public class BrokerController {
         return result;
     }
 
+    /**
+     * 注册putMessage的钩子
+     */
     public void registerMessageStoreHook() {
         List<PutMessageHook> putMessageHookList = messageStore.getPutMessageHookList();
 
+        /*
+         * 校验put的消息：例如topic的长度大小以及body不能为空能
+         */
         putMessageHookList.add(new PutMessageHook() {
             @Override
             public String hookName() {
@@ -906,6 +976,9 @@ public class BrokerController {
             }
         });
 
+        /*
+         * 校验批量消息
+         */
         putMessageHookList.add(new PutMessageHook() {
             @Override
             public String hookName() {
@@ -921,6 +994,11 @@ public class BrokerController {
             }
         });
 
+        /*
+         * 定时消息处理：
+         * 1.将时间轮消息放入 TimerMessageStore.TIMER_TOPIC
+         * 2.将延迟级别消息放入 TopicValidator.RMQ_SYS_SCHEDULE_TOPIC
+         */
         putMessageHookList.add(new PutMessageHook() {
             @Override
             public String hookName() {
@@ -936,6 +1014,9 @@ public class BrokerController {
             }
         });
 
+        /*
+         * TODO2 干什么的
+         */
         SendMessageBackHook sendMessageBackHook = new SendMessageBackHook() {
             @Override
             public boolean executeSendMessageBack(List<MessageExt> msgList, String brokerName, String brokerAddr) {
@@ -970,6 +1051,9 @@ public class BrokerController {
 
     }
 
+    /**
+     * 初始化acl权限控制
+     */
     private void initialAcl() {
         if (!this.brokerConfig.isAclEnable()) {
             LOG.info("The broker dose not enable acl");
@@ -1001,6 +1085,9 @@ public class BrokerController {
         }
     }
 
+    /**
+     * 初始化RPC远程调用的钩子
+     */
     private void initialRpcHooks() {
 
         List<RPCHook> rpcHooks = ServiceProvider.load(RPCHook.class);
@@ -1012,9 +1099,12 @@ public class BrokerController {
         }
     }
 
+    /**
+     * 注册netty消息处理器
+     */
     public void registerProcessor() {
         /*
-         * SendMessageProcessor
+         * SendMessageProcessor(发送消息处理器）
          */
         sendMessageProcessor.registerSendMessageHook(sendMessageHookList);
         sendMessageProcessor.registerConsumeMessageHook(consumeMessageHookList);
@@ -1028,22 +1118,22 @@ public class BrokerController {
         this.fastRemotingServer.registerProcessor(RequestCode.SEND_BATCH_MESSAGE, sendMessageProcessor, this.sendMessageExecutor);
         this.fastRemotingServer.registerProcessor(RequestCode.CONSUMER_SEND_MSG_BACK, sendMessageProcessor, this.sendMessageExecutor);
         /**
-         * PullMessageProcessor
+         * PullMessageProcessor（拉消息处理器）
          */
         this.remotingServer.registerProcessor(RequestCode.PULL_MESSAGE, this.pullMessageProcessor, this.pullMessageExecutor);
         this.remotingServer.registerProcessor(RequestCode.LITE_PULL_MESSAGE, this.pullMessageProcessor, this.litePullMessageExecutor);
         this.pullMessageProcessor.registerConsumeMessageHook(consumeMessageHookList);
         /**
-         * PeekMessageProcessor
+         * PeekMessageProcessor（探测消息处理器）
          */
         this.remotingServer.registerProcessor(RequestCode.PEEK_MESSAGE, this.peekMessageProcessor, this.pullMessageExecutor);
         /**
-         * PopMessageProcessor
+         * PopMessageProcessor（pop消息处理器，5.0后一种新的消费模式）
          */
         this.remotingServer.registerProcessor(RequestCode.POP_MESSAGE, this.popMessageProcessor, this.pullMessageExecutor);
 
         /**
-         * AckMessageProcessor
+         * AckMessageProcessor（ack消息处理器，pop消息才会ack)
          */
         this.remotingServer.registerProcessor(RequestCode.ACK_MESSAGE, this.ackMessageProcessor, this.ackMessageExecutor);
         this.fastRemotingServer.registerProcessor(RequestCode.ACK_MESSAGE, this.ackMessageProcessor, this.ackMessageExecutor);
@@ -1051,12 +1141,12 @@ public class BrokerController {
         this.remotingServer.registerProcessor(RequestCode.BATCH_ACK_MESSAGE, this.ackMessageProcessor, this.ackMessageExecutor);
         this.fastRemotingServer.registerProcessor(RequestCode.BATCH_ACK_MESSAGE, this.ackMessageProcessor, this.ackMessageExecutor);
         /**
-         * ChangeInvisibleTimeProcessor
+         * ChangeInvisibleTimeProcessor(改变消息可见性处理器)
          */
         this.remotingServer.registerProcessor(RequestCode.CHANGE_MESSAGE_INVISIBLETIME, this.changeInvisibleTimeProcessor, this.ackMessageExecutor);
         this.fastRemotingServer.registerProcessor(RequestCode.CHANGE_MESSAGE_INVISIBLETIME, this.changeInvisibleTimeProcessor, this.ackMessageExecutor);
         /**
-         * notificationProcessor
+         * notificationProcessor（）
          */
         this.remotingServer.registerProcessor(RequestCode.NOTIFICATION, this.notificationProcessor, this.pullMessageExecutor);
 
@@ -1139,8 +1229,13 @@ public class BrokerController {
         this.brokerStats = brokerStats;
     }
 
+    /**
+     * 消费者消费过慢，则禁用消费组
+     */
     public void protectBroker() {
+        //默认是没有开启的
         if (this.brokerConfig.isDisableConsumeIfConsumerReadSlowly()) {
+            //TODO2 逻辑不清楚
             for (Map.Entry<String, MomentStatsItem> next : this.brokerStatsManager.getMomentStatsItemSetFallSize().getStatsItemTable().entrySet()) {
                 final long fallBehindBytes = next.getValue().getValue().get();
                 if (fallBehindBytes > this.brokerConfig.getConsumerFallbehindThreshold()) {
@@ -1535,13 +1630,15 @@ public class BrokerController {
     protected void startBasicService() throws Exception {
 
         if (this.messageStore != null) {
+            //消息存储
             this.messageStore.start();
         }
 
         if (this.timerMessageStore != null) {
+            //定时消息存储
             this.timerMessageStore.start();
         }
-
+        // 副本管理器启动
         if (this.replicasManager != null) {
             this.replicasManager.start();
         }
@@ -1551,9 +1648,11 @@ public class BrokerController {
         }
 
         if (this.remotingServer != null) {
+            // netty服务端启动
             this.remotingServer.start();
 
-            // In test scenarios where it is up to OS to pick up an available port, set the listening port back to config
+            // In test scenarios where it is up to OS to pick up an available port, set the
+            // listening port back to config(在由操作系统选取可用端口的测试方案中，将侦听端口设置回配置)
             if (null != nettyServerConfig && 0 == nettyServerConfig.getListenPort()) {
                 nettyServerConfig.setListenPort(remotingServer.localListenPort());
             }
@@ -1563,8 +1662,10 @@ public class BrokerController {
             this.fastRemotingServer.start();
         }
 
+        //创建broker对应host信息（解决多网卡）
         this.storeHost = new InetSocketAddress(this.getBrokerConfig().getBrokerIP1(), this.getNettyServerConfig().getListenPort());
 
+        // TODO3 暂时不知道有什么用
         for (BrokerAttachedPlugin brokerAttachedPlugin : brokerAttachedPlugins) {
             if (brokerAttachedPlugin != null) {
                 brokerAttachedPlugin.start();
@@ -1572,12 +1673,15 @@ public class BrokerController {
         }
 
         if (this.popMessageProcessor != null) {
+            //启动pop长轮训service
             this.popMessageProcessor.getPopLongPollingService().start();
+
             this.popMessageProcessor.getPopBufferMergeService().start();
             this.popMessageProcessor.getQueueLockManager().start();
         }
 
         if (this.ackMessageProcessor != null) {
+            //启动pop消息恢复的service
             this.ackMessageProcessor.startPopReviveService();
         }
 
@@ -1588,7 +1692,7 @@ public class BrokerController {
         if (this.topicQueueMappingCleanService != null) {
             this.topicQueueMappingCleanService.start();
         }
-
+        //文件观察service(用户观察TLS文件）
         if (this.fileWatchService != null) {
             this.fileWatchService.start();
         }
@@ -1598,9 +1702,10 @@ public class BrokerController {
         }
 
         if (this.clientHousekeepingService != null) {
+            //扫描异常客户端channel
             this.clientHousekeepingService.start();
         }
-
+        //broker统计管理器启动
         if (this.brokerStatsManager != null) {
             this.brokerStatsManager.start();
         }
@@ -1609,6 +1714,7 @@ public class BrokerController {
             this.brokerFastFailure.start();
         }
 
+        //启动广播消费管理器
         if (this.broadcastOffsetManager != null) {
             this.broadcastOffsetManager.start();
         }
@@ -1636,6 +1742,7 @@ public class BrokerController {
 
     public void start() throws Exception {
 
+        //这里可以控制注册broker的时间,比如启动10分钟后才注册到namesrv中，就可以配置disappearTimeAfterStart为10分钟
         this.shouldStartTime = System.currentTimeMillis() + messageStoreConfig.getDisappearTimeAfterStart();
 
         if (messageStoreConfig.getTotalReplicas() > 1 && this.brokerConfig.isEnableSlaveActingMaster()) {
@@ -1643,16 +1750,21 @@ public class BrokerController {
         }
 
         if (this.brokerOuterAPI != null) {
+            //启动broker和外部交互的api(注册broker、心跳等）
             this.brokerOuterAPI.start();
         }
-
+        //启动基础服务
         startBasicService();
 
         if (!isIsolated && !this.messageStoreConfig.isEnableDLegerCommitLog() && !this.messageStoreConfig.isDuplicationEnable()) {
+            /*
+             *会根据节点类型改变一些服务的状态
+             */
             changeSpecialServiceStatus(this.brokerConfig.getBrokerId() == MixAll.MASTER_ID);
             this.registerBrokerAll(true, false, true);
         }
 
+        //添加定时任务，注册broker的topicConfig信息（10秒后启动，默认30秒注册一次->定时任务的时间在10-60秒之间）
         scheduledFutures.add(this.scheduledExecutorService.scheduleAtFixedRate(new AbstractBrokerRunnable(this.getBrokerIdentity()) {
             @Override
             public void run0() {
@@ -1672,6 +1784,7 @@ public class BrokerController {
             }
         }, 1000 * 10, Math.max(10000, Math.min(brokerConfig.getRegisterNameServerPeriod(), 60000)), TimeUnit.MILLISECONDS));
 
+        // 如果从节点能够扮演主节点，就定时向namesrv发送心跳，并定时同步broker成员信息（默认1s)-->主从模式
         if (this.brokerConfig.isEnableSlaveActingMaster()) {
             scheduleSendHeartbeat();
 
@@ -1688,6 +1801,7 @@ public class BrokerController {
         }
 
         if (this.brokerConfig.isEnableControllerMode()) {
+            // controller模式下，定时向namesrv发送心跳
             scheduleSendHeartbeat();
         }
 
@@ -1707,6 +1821,9 @@ public class BrokerController {
         }, 10, 5, TimeUnit.SECONDS);
     }
 
+    /**
+     * 定时发送心跳(默认1s)
+     */
     protected void scheduleSendHeartbeat() {
         scheduledFutures.add(this.brokerHeartbeatExecutorService.scheduleAtFixedRate(new AbstractBrokerRunnable(this.getBrokerIdentity()) {
             @Override
@@ -2057,7 +2174,7 @@ public class BrokerController {
     }
 
     public void updateMinBroker(long minBrokerId, String minBrokerAddr, String offlineBrokerAddr,
-        String masterHaAddr) {
+                                String masterHaAddr) {
         if (brokerConfig.isEnableSlaveActingMaster() && brokerConfig.getBrokerId() != MixAll.MASTER_ID) {
             try {
                 if (lock.tryLock(3000, TimeUnit.MILLISECONDS)) {
@@ -2083,11 +2200,11 @@ public class BrokerController {
                 brokerAttachedPlugin.statusChanged(shouldStart);
             }
         }
-
+        //master节点会启动定时任务和时间轮消息
         changeScheduleServiceStatus(shouldStart);
-
+        //改变事务消息check状态（主节点true会开一个线程，固定时间去check事务消息）
         changeTransactionCheckServiceStatus(shouldStart);
-
+        //启动pop的ack处理器
         if (this.ackMessageProcessor != null) {
             LOG.info("Set PopReviveService Status to {}", shouldStart);
             this.ackMessageProcessor.setPopReviveServiceStatus(shouldStart);
@@ -2098,6 +2215,7 @@ public class BrokerController {
         if (isTransactionCheckServiceStart != shouldStart) {
             LOG.info("TransactionCheckService status changed to {}", shouldStart);
             if (shouldStart) {
+                //启动事务消息校验
                 this.transactionalMessageCheckService.start();
             } else {
                 this.transactionalMessageCheckService.shutdown(true);

@@ -117,7 +117,7 @@ public class MessageStoreConfig {
     private int bitMapLengthConsumeQueueExt = 64;
 
     // CommitLog flush interval
-    // flush data to disk
+    // flush data to disk(刷新commitLog间隔时间)
     @ImportantField
     private int flushIntervalCommitLog = 500;
 
@@ -128,8 +128,13 @@ public class MessageStoreConfig {
 
     private int maxRecoveryCommitlogFiles = 30;
 
+    /**
+     * 当磁盘使用率到达多大的时候警告
+     */
     private int diskSpaceWarningLevelRatio = 90;
-
+    /**
+     * 强制清理磁盘空间使用率（当磁盘使用率到达多大的时候会强制删除）
+     */
     private int diskSpaceCleanForciblyRatio = 85;
 
     /**
@@ -137,16 +142,16 @@ public class MessageStoreConfig {
      */
     private boolean useReentrantLockWhenPutMessage = true;
 
-    // Whether schedule flush
+    // Whether schedule flush（是否定时刷新commitLog）
     @ImportantField
     private boolean flushCommitLogTimed = true;
-    // ConsumeQueue flush interval
+    // ConsumeQueue flush interval(刷新consumeQueue间隔时间）
     private int flushIntervalConsumeQueue = 1000;
     // Resource reclaim interval
     private int cleanResourceInterval = 10000;
     // CommitLog removal interval
     private int deleteCommitLogFilesInterval = 100;
-    // ConsumeQueue removal interval
+    // ConsumeQueue removal interval（删除consume队列文件间隔）
     private int deleteConsumeQueueFilesInterval = 100;
     private int destroyMapedFileIntervalForcibly = 1000 * 120;
     private int redeleteHangedFileInterval = 1000 * 120;
@@ -170,7 +175,7 @@ public class MessageStoreConfig {
     // This ensures no on-the-wire or on-disk corruption to the messages occurred.
     // This check adds some overhead,so it may be disabled in cases seeking extreme performance.
     private boolean checkCRCOnRecover = true;
-    // How many pages are to be flushed when flush CommitLog
+    // How many pages are to be flushed when flush CommitLog(刷新提交日志时要刷新多少页)
     private int flushCommitLogLeastPages = 4;
     // How many pages are to be committed when commit data to file
     private int commitCommitLogLeastPages = 4;
@@ -178,7 +183,13 @@ public class MessageStoreConfig {
     private int flushLeastPagesWhenWarmMapedFile = 1024 / 4 * 16;
     // How many pages are to be flushed when flush ConsumeQueue
     private int flushConsumeQueueLeastPages = 2;
+    /**
+     * 彻底commitLog刷盘的间隔时间
+     */
     private int flushCommitLogThoroughInterval = 1000 * 10;
+    /**
+     * 彻底提交commitLog的间隔时间
+     */
     private int commitCommitLogThoroughInterval = 200;
     private int flushConsumeQueueThoroughInterval = 1000 * 60;
     @ImportantField
@@ -191,6 +202,9 @@ public class MessageStoreConfig {
     private int maxTransferCountOnMessageInDisk = 8;
     @ImportantField
     private int accessMessageInMemoryMaxRatio = 40;
+    /**
+     * 是否开启message的index文件
+     */
     @ImportantField
     private boolean messageIndexEnable = true;
     private int maxHashSlotNum = 5000000;
@@ -219,7 +233,14 @@ public class MessageStoreConfig {
     private int putMessageTimeout = 1000 * 8;
     private int slaveTimeout = 3000;
     private String messageDelayLevel = "1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h";
+
+    /**
+     * 刷新延迟级别消息offset时间间隔
+     */
     private long flushDelayOffsetInterval = 1000 * 10;
+    /**
+     * 是否强制清理文件
+     */
     @ImportantField
     private boolean cleanFileForciblyEnable = true;
     private boolean warmMapedFileEnable = false;
@@ -230,6 +251,9 @@ public class MessageStoreConfig {
     private long osPageCacheBusyTimeOutMills = 1000;
     private int defaultQueryMaxNum = 32;
 
+    /**
+     * 消息堆内存缓存
+     */
     @ImportantField
     private boolean transientStorePoolEnable = false;
     private int transientStorePoolSize = 5;
@@ -245,11 +269,18 @@ public class MessageStoreConfig {
 
     private boolean enableScheduleMessageStats = true;
 
+    /**
+     * 是否启动微消息队列
+     */
     private boolean enableLmq = false;
     private boolean enableMultiDispatch = false;
     private int maxLmqConsumeQueueNum = 20000;
 
     private boolean enableScheduleAsyncDeliver = false;
+
+    /**
+     * 定时任务异步传递最大待处理限制
+     */
     private int scheduleAsyncDeliverMaxPendingLimit = 2000;
     private int scheduleAsyncDeliverMaxResendNum2Blocked = 3;
 
@@ -368,8 +399,14 @@ public class MessageStoreConfig {
      */
     private long maxChecksumRange = 1024 * 1024 * 1024;
 
+    /**
+     * TODO1
+     */
     private int replicasPerDiskPartition = 1;
 
+    /**
+     * 逻辑磁盘空间清理强制阈值
+     */
     private double logicalDiskSpaceCleanForciblyThreshold = 0.8;
 
     private long maxSlaveResendLength = 256 * 1024 * 1024;
